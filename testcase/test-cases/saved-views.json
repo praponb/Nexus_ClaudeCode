@@ -1,0 +1,73 @@
+[
+  {
+    "test_id": "TC-FR-006-01",
+    "requirement_ids": ["FR-006"],
+    "title": "Create and apply own saved view",
+    "objective": "Verify a user can save the current filter/sort/column configuration as a named view and re-apply it.",
+    "priority": "High",
+    "type": "API+UI/Functional",
+    "preconditions": "operator session; a filter configuration applied on /assets.",
+    "test_data": "view name 'QA In-Stock Laptops', config {status: in_stock, category: Laptops, sort: name}",
+    "steps": [
+      "POST /api/v1/saved-views with name + config JSON.",
+      "GET /api/v1/saved-views — verify listed.",
+      "In UI, reset filters, then apply the saved view.",
+      "Verify URL/filters/table update to the saved configuration."
+    ],
+    "expected_result": "201 on create with uuid; view appears in owner's list; applying it restores exact filter/sort state in UI and URL; results match the configuration.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-006-02",
+    "requirement_ids": ["FR-006"],
+    "title": "Update and delete own saved view",
+    "objective": "Verify PATCH/DELETE on own views work and deleted views no longer apply.",
+    "priority": "Medium",
+    "type": "API/Functional",
+    "preconditions": "saved view from TC-FR-006-01.",
+    "test_data": "PATCH rename + changed config; then DELETE",
+    "steps": [
+      "PATCH /saved-views/<uuid> with new name/config.",
+      "GET to confirm update.",
+      "DELETE the view.",
+      "GET again; attempt to apply deleted view in UI."
+    ],
+    "expected_result": "PATCH 200 with updated fields; DELETE 204; subsequent GET 404; UI no longer lists the view; no errors applying remaining views.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-006-03",
+    "requirement_ids": ["FR-006", "FR-002"],
+    "title": "Saved views are private to owner (horizontal isolation)",
+    "objective": "Verify user B cannot see, apply, modify, or delete user A's private saved view.",
+    "priority": "High",
+    "type": "API/Security",
+    "preconditions": "operator owns view V; manager session exists (or second operator).",
+    "test_data": "view V uuid",
+    "steps": [
+      "As user B: GET /saved-views (list) — V must be absent.",
+      "As user B: GET /saved-views/<V uuid> directly.",
+      "As user B: PATCH and DELETE V.",
+      "As owner: confirm V unchanged."
+    ],
+    "expected_result": "V absent from B's list; direct GET/PATCH/DELETE return 404 (existence-leak avoidance); owner's view untouched. (Shared/published views behavior deferred if publishing is a Cycle 2+ feature — note in report.)",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-006-04",
+    "requirement_ids": ["FR-006"],
+    "title": "Saved view validation — malformed config rejected",
+    "objective": "Verify invalid config payloads are rejected with field errors.",
+    "priority": "Medium",
+    "type": "API/Negative",
+    "preconditions": "operator session.",
+    "test_data": "missing name; name > max length; config not an object; config with unknown filter keys (per contract tolerance); duplicate name for same owner (if uniqueness enforced)",
+    "steps": ["POST each invalid payload.", "Record responses."],
+    "expected_result": "400 VALIDATION_FAILED with specific field_errors for hard violations; documented tolerance for unknown config keys (reject or strip); no 500s; nothing partially persisted.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  }
+]

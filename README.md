@@ -81,7 +81,9 @@ Within each `CYCLE_n_IMPLEMENT_AND_TEST` state: Frontend, Backend, and QA
 test-design run concurrently (`asyncio.gather` over independent agent
 invocations); QA execution runs afterward, once frontend/backend
 deliverables for that cycle exist. A failed test is recorded as data, not an
-orchestration failure -- only setup-level errors (path/ownership/allowlist
+orchestration failure; an agent picking an unavailable command or malformed
+tool arguments is also non-fatal (the tool returns a structured error the
+model can recover from). Only setup-level errors (path/ownership
 violations, model-resolution failures, exhausted retries, or any other
 unexpected exception) transition the run to `FAILED`. See `state.py` for the
 implementation; `state_sequence(cycles_total)` generates this exact chain
@@ -109,8 +111,11 @@ Requires Python >=3.10,<4.0.
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e '.[dev]'
-cp .env.example .env
 ```
+
+Create `.env` at the repo root with the variables below (there is no
+`.env.example` to copy from — `.env` itself is the working config file;
+never commit it once it holds real credentials).
 
 ### Model configuration
 
@@ -249,3 +254,11 @@ traceability, and the final report.
 - **"Refusing to run with --cycles=N without --dev-cycles"** -- pass
   `--dev-cycles` if a non-default cycle count is intentional (development
   only); the production default is 3.
+- **A state (usually `TEAM_LEAD_DESIGN`) times out with `NodeTimeoutError`
+  even though the model/credentials are fine** -- kimi-k3 always runs in
+  extended thinking mode and can take several minutes to generate a large
+  response; the orchestrator already requests SSE streaming to avoid
+  connections stalling on long non-streaming completions (see
+  ASSUMPTIONS.md), but very large requirement sets may still need more time
+  than the default. Raise `AGENTIC_BUILDER_AGENT_TIMEOUT_SECONDS` in `.env`
+  (default 2400s / 40 min per attempt).

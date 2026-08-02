@@ -1,0 +1,132 @@
+[
+  {
+    "test_id": "TC-FR-024-01",
+    "requirement_ids": ["FR-024", "FR-008"],
+    "title": "Approval-gated transfer — pending request created, asset not moved until decision",
+    "objective": "Verify that when the transfer transition rule requires approval, POST transfer creates an ApprovalRequest (pending_approval) and the asset does not enter In Transit until approved.",
+    "priority": "Critical",
+    "type": "API/Integration",
+    "preconditions": "Transfer transition rule with requires_approval enabled (seed/config); transferable asset; requester (operator/manager) + approver (deptmgr+) users.",
+    "test_data": "transfer payload {to_location, reason}; Idempotency-Key",
+    "steps": [
+      "POST /assets/<uuid>/transfer as requester.",
+      "Verify response indicates pending approval and asset status unchanged.",
+      "GET /approvals as approver — verify request listed with type, requester, asset, reason, payload summary.",
+      "Verify the request is NOT listed (or is scope-hidden) for an out-of-scope approver."
+    ],
+    "expected_result": "Transfer deferred behind pending ApprovalRequest; no side effects on the asset pre-decision; inbox visibility scoped to eligible approvers (DeptManager+ per route table); request payload contains proposed changes + reason.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-024-02",
+    "requirement_ids": ["FR-024"],
+    "title": "Approve — decision executes underlying action with comments and audit linkage",
+    "objective": "Verify POST /approvals/:uuid/approve records the decision (approver, decided_at, comments), executes the underlying action (transfer proceeds to In Transit / disposal executes), and links audit events.",
+    "priority": "Critical",
+    "type": "API/Functional",
+    "preconditions": "Pending approval request from TC-FR-024-01.",
+    "test_data": "approve payload {comments 'Approved for Q4 move'}; Idempotency-Key",
+    "steps": [
+      "POST /api/v1/approvals/<uuid>/approve as eligible approver.",
+      "Verify approval status/decided_at/approver/comments persisted.",
+      "Verify underlying action executed (transfer status in_transit; asset updated).",
+      "Verify lifecycle + audit events reference the approval (correlation)."
+    ],
+    "expected_result": "Approval decision immutable-recorded; action executes atomically with the decision (no half-state on failure); events traceable both directions; replay with same Idempotency-Key does not double-execute.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-024-03",
+    "requirement_ids": ["FR-024"],
+    "title": "Reject and return-for-changes — no side effects, comments required/recorded",
+    "objective": "Verify reject and return endpoints record the decision with comments and leave the underlying asset/request payload unchanged; requester can see the outcome.",
+    "priority": "High",
+    "type": "API/Functional",
+    "preconditions": "Two pending approval requests (one to reject, one to return).",
+    "test_data": "reject {comments 'Not cost-justified'}; return {comments 'Please split into two transfers'}",
+    "steps": [
+      "POST reject on request A; verify status rejected + comments; asset unchanged.",
+      "POST return on request B; verify status returned + comments; asset unchanged.",
+      "Verify requester visibility of both outcomes (inbox/notification when delivered)."
+    ],
+    "expected_result": "Both decisions recorded immutably with comments; zero mutation to target assets; request state machine consistent (decided requests no longer actionable).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-024-04",
+    "requirement_ids": ["FR-024"],
+    "title": "Separation of duties — requester cannot approve own request when enabled",
+    "objective": "Verify that when SoD is enabled, the requester (even with approver role) cannot decide their own request (403 with stable code); when disabled, behavior matches config documentation.",
+    "priority": "Critical",
+    "type": "API/Security",
+    "preconditions": "SoD config enabled; a user holding both requester and approver capabilities creates a request.",
+    "test_data": "self-approval attempt; another approver as control",
+    "steps": [
+      "As the requester-approver user, POST approve on own request → record status/code.",
+      "As a different eligible approver, approve → success control.",
+      "Verify audit trail shows SoD denial."
+    ],
+    "expected_result": "Self-approval rejected (403 PERMISSION_DENIED or dedicated stable code) with user-safe message; independent approver succeeds; denial audited; config-off behavior documented if tested.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-024-05",
+    "requirement_ids": ["FR-024", "BR-003"],
+    "title": "Approval history immutable after decision",
+    "objective": "Verify decided approvals cannot be re-decided, edited, or deleted; history (request + decision + comments) is preserved and readable by authorized roles.",
+    "priority": "High",
+    "type": "API/Negative",
+    "preconditions": "One approved and one rejected request.",
+    "test_data": "second approve/reject attempts; PATCH/DELETE probes",
+    "steps": [
+      "Attempt to approve an already-approved request → expect 409.",
+      "Attempt reject on a rejected request → expect 409.",
+      "Attempt PATCH/DELETE on the approval resource → expect 404/405.",
+      "GET approval detail → full history intact."
+    ],
+    "expected_result": "Re-decision blocked with stable 409 code; no mutation surface; request + decision + comments preserved verbatim; history included in audit trail.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-024-06",
+    "requirement_ids": ["FR-024", "FR-002"],
+    "title": "Approval inbox authorization — role + scope filtering",
+    "objective": "Verify GET /approvals lists only requests the user is eligible to decide (DeptManager+ within scope; admin/manager per capability map); employee/operator/auditor receive 403 or empty-scoped lists per contract; direct access to out-of-scope request → 404.",
+    "priority": "High",
+    "type": "API/Security",
+    "preconditions": "Pending requests in dept A and dept B; deptmgr-A, deptmgr-B, operator, employee, auditor, admin sessions.",
+    "test_data": "GET /approvals per role; direct GET/decision attempts on cross-scope request uuid",
+    "steps": [
+      "List inbox as each role; record contents/status.",
+      "deptmgr-A attempts to approve dept-B request → expect 404.",
+      "employee/auditor attempts → expect 403."
+    ],
+    "expected_result": "Inbox scoped correctly; cross-scope decision attempts → 404 (ADR-007); insufficient roles → 403; no payload details leaked in error bodies.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-024-07",
+    "requirement_ids": ["FR-024", "LAY-1"],
+    "title": "E2E — approval inbox UI: list, review payload, decide with comments",
+    "objective": "UI journey: approver opens /approvals, reviews a pending transfer request (asset, requester, proposed change, reason), approves with comment; requester sees outcome; decided item leaves the actionable inbox.",
+    "priority": "High",
+    "type": "E2E/Journey",
+    "preconditions": "Full stack; Playwright; pending request; approver + requester credentials.",
+    "test_data": "pending transfer approval",
+    "steps": [
+      "Sign in as approver; open /approvals; verify list shows request with context.",
+      "Open detail/dialog; verify proposed-change diff + reason rendered safely.",
+      "Approve with comment; verify success only after server confirm; item removed/marked decided.",
+      "As requester: verify outcome visible (inbox/notification)."
+    ],
+    "expected_result": "Inbox matches API truth; decision flow per §8.5 (confirm dialog, no optimistic completion); scope/role hiding in UI mirrors backend; evidence screenshots captured.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (Playwright)"
+  }
+]

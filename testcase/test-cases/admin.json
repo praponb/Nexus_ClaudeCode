@@ -1,0 +1,148 @@
+[
+  {
+    "test_id": "TC-FR-027-01",
+    "requirement_ids": ["FR-027", "FR-002"],
+    "title": "User admin — list users with roles/scopes, admin-only access",
+    "objective": "Verify GET /admin/users returns users (display name, username, role, scopes, active flag) for system_admin only; non-admins get 403; secrets never present in payloads.",
+    "priority": "Critical",
+    "type": "API/Security",
+    "preconditions": "Seeded users; admin + manager + operator sessions.",
+    "test_data": "GET /api/v1/admin/users per role",
+    "steps": [
+      "GET list as admin; verify fields incl. role + scopes + active.",
+      "Scan payload for password/hash/token-like fields.",
+      "GET as manager and operator → expect 403."
+    ],
+    "expected_result": "Admin-only visibility; complete non-secret user fields; zero credential material in any response; pagination envelope consistent.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-027-02",
+    "requirement_ids": ["FR-027", "FR-025"],
+    "title": "Assign role and scopes — effective immediately and audited",
+    "objective": "Verify PATCH /admin/users/:uuid changes role/scopes; the target user's effective permissions change on next request; the change is audited with before/after.",
+    "priority": "Critical",
+    "type": "API/Integration",
+    "preconditions": "Target user T (employee) with no scopes; admin session.",
+    "test_data": "PATCH {role: 'operator', scopes: [{type: 'department', uuid: <dept A>}]}",
+    "steps": [
+      "As T: attempt POST /assets → expect 403 (pre-change control).",
+      "As admin: PATCH role/scopes for T.",
+      "As T: create asset in dept A → success; attempt asset in dept B → 404.",
+      "Verify audit event with before/after role/scope."
+    ],
+    "expected_result": "Changes take effect without re-seeding; scope predicate enforced immediately; audit complete (actor=admin, before/after); invalid role/scope values → 400.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-027-03",
+    "requirement_ids": ["FR-027"],
+    "title": "Deactivate user — sessions revoked/denied, records preserved",
+    "objective": "Verify deactivating a user blocks their login/API access while preserving their historical records (assignments, audit authorship) intact.",
+    "priority": "High",
+    "type": "API/Functional",
+    "preconditions": "Active user U with an existing session and authored records.",
+    "test_data": "PATCH {active: false} on U; then login + /auth/me attempts as U",
+    "steps": [
+      "Deactivate U as admin.",
+      "Attempt login as U → expect failure (generic message).",
+      "Attempt API call with U's pre-existing session cookie → expect 401/403.",
+      "Verify U's historical assignment/audit records still reference U correctly."
+    ],
+    "expected_result": "Access fully revoked (new login + existing session); history untouched; reactivation restores access; actions audited.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-027-04",
+    "requirement_ids": ["FR-027", "BR-006"],
+    "title": "Cannot remove/deactivate the final active System Administrator",
+    "objective": "Verify attempts to deactivate or demote the last active system_admin are rejected with a stable error; with 2+ admins, deactivating one succeeds.",
+    "priority": "Critical",
+    "type": "API/Negative",
+    "preconditions": "Exactly one active admin A1 in the test fixture (and a second admin A2 creatable).",
+    "test_data": "PATCH {active:false} on A1; PATCH {role:'auditor'} on A1; then add A2 and retry deactivate A1",
+    "steps": [
+      "Attempt deactivate A1 (sole admin) → record error.",
+      "Attempt demote A1 to auditor → record error.",
+      "Create/promote A2 to system_admin; deactivate A1 → success."
+    ],
+    "expected_result": "Sole-admin operations rejected (409 or 400 with documented code, user-safe message); guard verified at service level (not only UI); successful path works once another admin exists; all attempts audited.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-025-05",
+    "requirement_ids": ["FR-025", "FR-027"],
+    "title": "Audit-events read API — restricted, filterable, no mutation surface",
+    "objective": "Verify GET /admin/audit-events is admin/auditor-only (per capability), filterable by actor/action/target/correlation/date, paginated, and exposes no edit/delete methods.",
+    "priority": "High",
+    "type": "API/Security",
+    "preconditions": "Existing audit events from prior tests; admin, auditor, manager sessions.",
+    "test_data": "filters: action=asset.create, correlation_id=<known>, date range; POST/PATCH/DELETE probes",
+    "steps": [
+      "GET audit events as admin with each filter; verify matching subsets.",
+      "GET as auditor (per capability map) and manager → record allowed/denied.",
+      "Attempt unsafe methods on the endpoint and on a specific event."
+    ],
+    "expected_result": "Read restricted per capability; filters + pagination envelope correct; 405/404 for mutations; sensitive payloads (none expected — no credentials anywhere in before/after JSONB, spot-check).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-030-01",
+    "requirement_ids": ["FR-030", "BR-003"],
+    "title": "Archiving preserves references and history; no physical delete via operations",
+    "objective": "Verify archiving an asset (record_status=archived) retains all assignments/lifecycle/audit/attachments references, removes it from default operational lists while remaining retrievable by authorized query, and no operational endpoint physically deletes business records.",
+    "priority": "High",
+    "type": "API/DataIntegrity",
+    "preconditions": "Asset with rich history (assignments, maintenance, attachments).",
+    "test_data": "archive action (endpoint/config per delivery); default list; archived-inclusive query",
+    "steps": [
+      "Archive the asset via the documented mechanism.",
+      "Verify default /assets list excludes it; archived-inclusive query finds it with full history.",
+      "Verify attachments still downloadable by authorized users; audit chain intact (recompute tail hash linkage if tooling exists).",
+      "Probe for any hard-delete surface (DELETE on business entities) → must not exist."
+    ],
+    "expected_result": "Archive = logical only; history/references fully preserved and readable; no physical delete anywhere in the API surface; dashboards/reports treat archived per documented rules.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-030-02",
+    "requirement_ids": ["FR-030"],
+    "title": "Retention rules and legal/audit hold prevent purge",
+    "objective": "Verify configurable retention rules identify purge-eligible records, but records under legal/audit hold are never purged; purge execution (if delivered) is dry-run-first, audited, and admin-only.",
+    "priority": "Medium",
+    "type": "API/Functional",
+    "preconditions": "Retention config delivered; aged records; a record flagged on hold.",
+    "test_data": "retention rule (e.g., archived > N years); hold flag on one record; purge dry-run/execute calls",
+    "steps": [
+      "Evaluate retention → verify eligible set matches ground truth minus held records.",
+      "Verify held record excluded from any purge plan.",
+      "If purge execute exists: verify dry-run output, admin-only enforcement, and audit of actual purge; else verify documented 'retention evaluation only in v1'."
+    ],
+    "expected_result": "Hold always wins; eligibility computed per configured rules; any destructive operation is gated, dry-runnable, and audited; no silent data loss.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (API) partially manual (config)"
+  },
+  {
+    "test_id": "TC-FR-026-01",
+    "requirement_ids": ["FR-026", "LAY-1"],
+    "title": "Reference-data admin UI — manage values incl. deactivate semantics",
+    "objective": "UI: admin manages reference data (create/edit/reorder/deactivate) at /admin/reference-data; in-use values show deactivate (not delete) with explanation; deactivated values hidden from pickers but retained on records.",
+    "priority": "Medium",
+    "type": "UI/E2E",
+    "preconditions": "Full stack; Playwright; admin credentials.",
+    "test_data": "a category and a location (one in-use)",
+    "steps": [
+      "Create a new reference value via UI; verify it appears in asset form pickers.",
+      "Deactivate an in-use value; verify UI explains retention; verify existing records still display it and pickers exclude it.",
+      "Verify non-admin roles cannot reach the admin UI (403 page/redirect)."
+    ],"expected_result": "UI mirrors BR-004 API semantics (verified C2); clear affordances and confirmations; role gating client+server. (Browser-unavailable → BLOCKED.)",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (Playwright)"
+  }
+]

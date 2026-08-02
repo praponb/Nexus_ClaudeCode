@@ -1,0 +1,72 @@
+[
+  {
+    "test_id": "TC-FR-017-01",
+    "requirement_ids": ["FR-017", "D-14"],
+    "title": "QR label endpoint generates scannable code for asset tag",
+    "objective": "Verify GET /assets/:uuid/label returns a QR (SVG/PNG per D-14) encoding the asset tag + deep link (/scan?tag=...), authorized per scope.",
+    "priority": "High",
+    "type": "API/Functional",
+    "preconditions": "Operator session; seeded asset with tag.",
+    "test_data": "asset tag e.g. 'AST-000123'",
+    "steps": [
+      "GET /api/v1/assets/<uuid>/label; verify content type and payload.",
+      "Decode QR content (test library or manual scan) and verify it encodes the tag + deep-link URL.",
+      "Request label as out-of-scope/unauthenticated user."
+    ],
+    "expected_result": "Label endpoint returns SVG or PNG with correct encoded payload (tag + /scan?tag= deep link); unauthorized → 401/403/404 per scope rules; label generation audited if documented.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (decode via library)"
+  },
+  {
+    "test_id": "TC-FR-017-02",
+    "requirement_ids": ["FR-017", "LAY-1"],
+    "title": "Printable label page — single and batch",
+    "objective": "Verify /assets/[id]/label renders a print-ready 50×25mm label (tag human-readable + QR) and batch print works from the register selection if delivered.",
+    "priority": "Medium",
+    "type": "UI/Functional",
+    "preconditions": "Browser; operator signed in.",
+    "test_data": "single asset; selection of 5 assets for batch",
+    "steps": [
+      "Open label page; verify layout contains tag text (monospace) + QR image; invoke print and inspect print stylesheet (no app chrome).",
+      "Batch-select assets in register (if feature delivered); generate combined labels."
+    ],
+    "expected_result": "Label matches print spec (dimensions via CSS, human-readable tag, QR); print view excludes navigation; batch produces one label per selected asset; feature flag/absence documented if batch deferred.",
+    "status": "NOT_RUN",
+    "automation_status": "partially manual (print inspection), Playwright for DOM"
+  },
+  {
+    "test_id": "TC-FR-017-03",
+    "requirement_ids": ["FR-017"],
+    "title": "Scan flow — known tag resolves to asset; manual entry fallback",
+    "objective": "Verify /scan?tag=<known> resolves to the asset (detail or scan result panel) and manual tag entry works identically to camera scanning.",
+    "priority": "High",
+    "type": "UI/E2E",
+    "preconditions": "Browser; operator signed in; known seeded tag. (Camera scanning simulated — no physical camera in CI.)",
+    "test_data": "known tag; deep link /scan?tag=<tag>",
+    "steps": [
+      "Navigate to /scan?tag=<known tag>; verify resolution to the correct asset with clear action options.",
+      "Open /scan; use manual entry with the same tag; verify identical result.",
+      "Verify Employee role gets lookup-level access only (per route table) while Operator gets actions."
+    ],
+    "expected_result": "Deep link + manual entry both resolve deterministically to the same asset; result panel shows identity (tag, name, status) and permitted actions only; role-appropriate capabilities enforced server-side.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (Playwright, manual-entry path)"
+  },
+  {
+    "test_id": "TC-FR-017-04",
+    "requirement_ids": ["FR-017"],
+    "title": "Unknown/malformed code — clear non-destructive result",
+    "objective": "Verify scanning/entering an unknown or malformed tag yields a clear 'not found' result with next actions (register new asset if permitted) and no data mutation.",
+    "priority": "High",
+    "type": "UI/Negative",
+    "preconditions": "Browser; operator signed in.",
+    "test_data": "unknown tag 'AST-999999'; malformed strings ('<script>alert(1)</script>', 500-char string, SQL probe)",
+    "steps": [
+      "Enter each value in manual entry (and as /scan?tag= param).",
+      "Observe results and network calls."
+    ],
+    "expected_result": "Clear non-destructive 'no asset found' messaging; malformed input safely handled (no execution, no 500); offer to register a new asset shown only to roles with create permission; nothing created/changed by lookups.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (Playwright)"
+  }
+]

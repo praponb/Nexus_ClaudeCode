@@ -1,0 +1,53 @@
+[
+  {
+    "test_id": "TC-FR-013-01",
+    "requirement_ids": ["FR-013"],
+    "title": "Report lost/stolen/missing/damaged — exception recorded with evidence",
+    "objective": "Verify POST /assets/:uuid/report-exception records the exception type, narrative, and evidence, transitions status per rules, and emits lifecycle + audit events.",
+    "priority": "High",
+    "type": "API/Functional",
+    "preconditions": "employee E with assigned asset (self-report path); operator session; assigned asset.",
+    "test_data": "(a) {type: lost, note: 'Left on train', evidence: <attachment uuid if supported>} by custodian; (b) {type: damaged, note: 'Dropped'} by operator",
+    "steps": [
+      "As custodian E: report lost on own assigned asset.",
+      "Verify asset status transitions (lost) and exception record persisted.",
+      "As operator: report damaged on in-scope asset.",
+      "Verify lifecycle + audit events for both."
+    ],
+    "expected_result": "Exception recorded with type/reporter/timestamp/evidence; status per transition rules; custodian self-report allowed for own assets; events audited.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-013-02",
+    "requirement_ids": ["FR-013", "BR-003"],
+    "title": "Resolution preserves original event — no erasure",
+    "objective": "Verify resolving an exception (e.g., lost asset recovered) creates a resolution event while the original exception remains intact in history (BR-003).",
+    "priority": "High",
+    "type": "API/Functional",
+    "preconditions": "asset with open lost exception.",
+    "test_data": "resolution {action: recovered, note: 'Found in storage', resulting_status: in_stock}",
+    "steps": [
+      "Resolve the exception via delivered endpoint/flow.",
+      "Verify asset status updated per resolution.",
+      "Verify history shows BOTH the original lost report and the resolution, unedited."
+    ],
+    "expected_result": "Resolution appended; original exception immutable; full trail in activity feed/history; audit events for resolution.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-013-03",
+    "requirement_ids": ["FR-013", "FR-002"],
+    "title": "Exception reporting authorization",
+    "objective": "Verify employees can report exceptions only on own-custody assets; others' assets and out-of-scope reports denied; auditor cannot report.",
+    "priority": "High",
+    "type": "API/Security",
+    "preconditions": "employee E (custodian of A, not of B); auditor session; asset C out of E's custody.",
+    "test_data": "exception payloads for assets B and C",
+    "steps": ["As E: report exception on B and C → expect 403/404.", "As auditor: report on any asset → 403."],
+    "expected_result": "Denied with envelope codes; no exception records created; auditor fully read-only.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  }
+]

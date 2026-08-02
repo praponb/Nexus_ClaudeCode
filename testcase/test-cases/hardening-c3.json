@@ -1,0 +1,93 @@
+[
+  {
+    "test_id": "TC-HARD-001",
+    "requirement_ids": ["FR-028", "FR-020", "D-08"],
+    "title": "Mandatory backend tests landed — data-quality queue, dashboard KPIs, idempotency on transfer/return/reserve",
+    "objective": "Verify the Cycle-3 mandatory test additions (design §2.5) exist and pass: FR-028 issue-queue tests, full dashboard KPI set tests (TC-FR-020-04 gap), Idempotency-Key replay tests for transfer/return/reserve.",
+    "priority": "Critical",
+    "type": "Build/QualityGate",
+    "preconditions": "C3 backend deliverables; pytest allowlisted.",
+    "test_data": "pytest run + collection inventory",
+    "steps": [
+      "Run backend pytest; confirm green.",
+      "Collect test inventory; verify presence of data-quality tests (issue flagging, severity, resolve), dashboard KPI tests (overdue returns, maintenance due, warranty expiring, missing, by-category), and idempotent replay tests for transfer/return/reserve.",
+      "If any mandatory class is absent → FAILED with defect citing §2.5 mandate."
+    ],
+    "expected_result": "Suite green AND contains all three mandated coverage classes; on success, QA re-executes TC-FR-028-01/02, TC-FR-020-04, and TC-D08-03 as PASSED with the new evidence.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-NFR-006-01",
+    "requirement_ids": ["NFR-006", "NFR-004"],
+    "title": "Planning-volume performance check — ~100k assets dataset",
+    "objective": "Generate the planning-volume dataset (design §10.4 C3 command, ~100k assets) and measure dashboard p95 ≤3s, filtered search p95 ≤2s, asset detail p95 ≤2s; verify indexes used (no seq-scan hot paths) and no N+1.",
+    "priority": "High",
+    "type": "Performance/Volume",
+    "preconditions": "Volume-generation command delivered; environment with PostgreSQL able to host the dataset (compose or local); timing harness.",
+    "test_data": "generated ~100k assets + related assignments/events; 20+ timed samples per endpoint",
+    "steps": [
+      "Run the volume-generation command; record duration and row counts.",
+      "Measure dashboard summary, representative filtered searches, and asset detail latencies (min/median/p95).",
+      "Spot-check query plans for hot endpoints (index usage); run any assertNumQueries tests.",
+      "Record all numbers as evidence; if the environment cannot host the volume, document the largest tested dataset + manual procedure."
+    ],
+    "expected_result": "Targets met at planning volume, or precise measured deviations filed as defects with data; generation command idempotent/re-runnable and separate from seed_dev; results documented in release notes.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable where environment hosts the volume; else MANUAL with documented procedure"
+  },
+  {
+    "test_id": "TC-NFR-012-01",
+    "requirement_ids": ["NFR-012"],
+    "title": "Backup/restore procedure documented and walkthrough-drilled",
+    "objective": "Verify a written backup/restore procedure exists (PostgreSQL encrypted backups, attachment storage coordination, RTO ≤8h / RPO ≤24h interim) and execute a walkthrough restore drill on a disposable database, verifying data + audit-chain integrity after restore.",
+    "priority": "High",
+    "type": "Operations/DR",
+    "preconditions": "Procedure document delivered; disposable PostgreSQL available (local instance suffices); pg_dump/pg_restore or documented tooling present.",
+    "test_data": "seeded database; procedure doc",
+    "steps": [
+      "Review the procedure for completeness (scope, encryption, attachments, scheduling, roles, RTO/RPO mapping).",
+      "Execute a backup of the seeded DB; drop/restore into a fresh DB per the document.",
+      "Verify row counts on key tables and audit hash-chain integrity post-restore; verify app boots against restored DB if feasible."
+    ],
+    "expected_result": "Document accurate enough to follow without tribal knowledge; drill succeeds with zero data discrepancy and intact audit chain; gaps filed as defects. If tooling unavailable in QA env → MANUAL with the drill script attached.",
+    "status": "NOT_RUN",
+    "automation_status": "partially automatable; likely MANUAL for full drill"
+  },
+  {
+    "test_id": "TC-NFR-007-08",
+    "requirement_ids": ["NFR-007"],
+    "title": "Cycle-3 security sweep — new endpoints inherit all controls",
+    "objective": "Verify every C3 endpoint (reservations, approvals, notifications, reports, admin, retire/dispose/reopen, data-quality) enforces authentication, role/scope authorization, CSRF, error-envelope shape, and rate limiting where documented — no control gaps on the new surface.",
+    "priority": "Critical",
+    "type": "Security/Regression",
+    "preconditions": "C3 endpoints live in OpenAPI; backend test suite.",
+    "test_data": "unauthenticated requests to each new endpoint; employee-role mutation attempts; missing-CSRF POST probes; OpenAPI diff review",
+    "steps": [
+      "Probe each new endpoint without session → expect 401 envelope.",
+      "Probe mutations as employee → expect 403 PERMISSION_DENIED.",
+      "Probe one new POST without CSRF (enforce_csrf_checks) → 403.",
+      "Review OpenAPI diff for accidentally-public or permission-missing operations."
+    ],
+    "expected_result": "Uniform control enforcement across the new surface (401/403/404 per contract, ADR-007); no endpoint ships with default-deny bypass; findings filed as defects with severity.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-HARD-002",
+    "requirement_ids": ["NFR-003", "NFR-002", "LAY-7"],
+    "title": "Final responsive/a11y execution attempt — C3 pages + carried C1/C2 pages",
+    "objective": "Final attempt at the browser matrix (responsive breakpoints, axe zero critical/serious, keyboard pass) covering new C3 pages (/reservations, /approvals, /reports, /notifications, /admin/*) plus previously blocked pages; if the environment still lacks a browser, produce the documented manual-verification procedure per §17.",
+    "priority": "High",
+    "type": "UI/Accessibility",
+    "preconditions": "Playwright/browser availability (probe); else documentation path.",
+    "test_data": "viewport matrix; axe-core; keyboard-only pass on J-5 and approvals journeys",
+    "steps": [
+      "Probe for browser runner; if present, execute the responsive + axe + keyboard suites and capture evidence.",
+      "If absent: verify manual-verification procedures are documented for each remaining blocked UI case (steps, expected results, sign-off checklist) and mark cases MANUAL/BLOCKED accordingly."
+    ],
+    "expected_result": "Executed evidence for the matrix, or honest MANUAL/BLOCKED statuses with complete documented procedures — never silent passes; status recorded in release statement.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable if browser present; else documentation verification"
+  }
+]

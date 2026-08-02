@@ -1,0 +1,180 @@
+[
+  {
+    "test_id": "TC-FR-018-01",
+    "requirement_ids": ["FR-018"],
+    "title": "Import template download matches contract",
+    "objective": "Verify GET /imports/template returns a CSV template whose headers match the documented importable fields, UTF-8 encoded, with no sample personal data.",
+    "priority": "High",
+    "type": "API/Functional",
+    "preconditions": "Operator session.",
+    "test_data": "none",
+    "steps": [
+      "GET /api/v1/imports/template.",
+      "Verify content type, encoding, header row against OpenAPI/README documentation."
+    ],
+    "expected_result": "200 CSV (text/csv, UTF-8); headers exactly match documented field set incl. required markers; no real personal/financial sample values.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-018-02",
+    "requirement_ids": ["FR-018"],
+    "title": "Import upload → validate/preview with row-level errors",
+    "objective": "Verify POST /imports (multipart) parses the CSV, applies field mapping, and returns a validation preview with per-row/per-field errors and counts before any commit.",
+    "priority": "Critical",
+    "type": "API/Integration",
+    "preconditions": "Operator session; celery worker running (or eager mode documented).",
+    "test_data": "CSV of 20 rows: 15 valid, 5 invalid (missing required name/category, bad date format, unknown category code, bad UUID reference, duplicate tag within file)",
+    "steps": [
+      "POST /imports with the CSV and default mapping.",
+      "GET /imports/<uuid> until validation completes; inspect preview payload.",
+      "Verify no assets were created at this stage."
+    ],
+    "expected_result": "Preview reports created/updated/skipped/failed projections with exact row numbers + field-level messages (IMPORT_ROW_INVALID details); zero writes before commit; job status transitions queued→processing→(validated/completed) observable.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (pytest with eager celery)"
+  },
+  {
+    "test_id": "TC-FR-018-03",
+    "requirement_ids": ["FR-018"],
+    "title": "Duplicate policies — reject / update / create behave per selection",
+    "objective": "Verify the duplicate-handling policy (reject|update|create) is honored on commit for rows colliding on tag/serial per configuration.",
+    "priority": "Critical",
+    "type": "API/Integration",
+    "preconditions": "Existing asset with tag 'AST-DUP-1' and known serial.",
+    "test_data": "3 CSVs (or 3 jobs) each containing a row for tag AST-DUP-1, committed with policy reject / update / create respectively",
+    "steps": [
+      "Commit job with policy=reject → row failed with duplicate reason; asset unchanged.",
+      "Commit job with policy=update → asset updated (version incremented, audited before/after).",
+      "Commit job with policy=create → behavior per spec (new unique tag or explicit rejection — document actual contract)."
+    ],
+    "expected_result": "Each policy produces the documented outcome with accurate counts; update path respects optimistic concurrency + audit; create-with-duplicate never violates tag uniqueness (BR-001).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-018-04",
+    "requirement_ids": ["FR-018", "FR-002"],
+    "title": "Partial success authorization and result report",
+    "objective": "Verify partial success commits valid rows only when the policy/user is authorized for it, and the result report (GET /imports/:uuid/result) details created/updated/skipped/failed with row/field messages.",
+    "priority": "High",
+    "type": "API/Functional",
+    "preconditions": "Validated import job with mixed valid/invalid rows (TC-FR-018-02).",
+    "test_data": "commit with partial-success enabled",
+    "steps": [
+      "POST /imports/<uuid>/commit (with Idempotency-Key).",
+      "Poll job until completed; GET result report.",
+      "Verify created assets exist and invalid rows did not create partial records."
+    ],
+    "expected_result": "Valid rows committed atomically per row (no half-written assets); failed rows listed with precise messages; counts in result report reconcile with database state; job + results audited; result downloadable/viewable only by authorized users.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-018-05",
+    "requirement_ids": ["FR-018", "NFR-007"],
+    "title": "CSV formula injection neutralized on import and export",
+    "objective": "Verify cells beginning with = + - @ are treated as text on import (sanitized/flagged per spec) and that exports prefix dangerous leading characters.",
+    "priority": "Critical",
+    "type": "Security/DataIntegrity",
+    "preconditions": "Operator session.",
+    "test_data": "CSV rows with name '=HYPERLINK(\"http://evil\")', description '+CMD', serial '@evil', notes '-1+1'; then export those assets",
+    "steps": [
+      "Import the weaponized CSV; verify stored values are literal text or sanitized per documented policy (no formula execution anywhere server-side).",
+      "Export the affected assets; open CSV and inspect the same fields' leading characters."
+    ],
+    "expected_result": "Import never executes/interprets formulas; stored values documented (literal or prefixed); export prefixes dangerous leading chars (e.g., apostrophe) per design §13; UTF-8 encoding intact; no data corruption of legitimate negative numbers in numeric fields.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-018-06",
+    "requirement_ids": ["FR-018"],
+    "title": "Import commit is idempotent and safely repeatable",
+    "objective": "Verify re-committing the same job (retry/double-click) with the same Idempotency-Key does not duplicate created assets, and a second commit attempt returns the stored result.",
+    "priority": "High",
+    "type": "API/Concurrency",
+    "preconditions": "Validated import job ready to commit.",
+    "test_data": "same Idempotency-Key sent twice; parallel commit attempts in pytest",
+    "steps": [
+      "POST commit with key K; wait for completion; record created count.",
+      "POST commit again with key K (and once without key if contract allows); record behavior.",
+      "Verify asset counts and tag uniqueness."
+    ],
+    "expected_result": "Second commit with same key returns the recorded response without re-executing; no duplicate assets; parallel attempts serialized safely; result report unchanged and consistent.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (pytest)"
+  },
+  {
+    "test_id": "TC-FR-018-07",
+    "requirement_ids": ["FR-018", "NFR-008"],
+    "title": "Import Unicode and encoding handling",
+    "objective": "Verify UTF-8 CSVs with non-ASCII names/locations/notes import correctly (Unicode storage, A-01) without mojibake, and BOM-prefixed files are handled.",
+    "priority": "Medium",
+    "type": "API/DataIntegrity",
+    "preconditions": "Operator session.",
+    "test_data": "CSV with Japanese/Arabic/emoji names, accented locations, CRLF line endings, UTF-8 BOM variant",
+    "steps": [
+      "Import and commit; fetch created assets; compare field values byte-accurately."
+    ],
+    "expected_result": "All Unicode values round-trip exactly; BOM tolerated; invalid encoding rejected with clear error (not silent corruption).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-019-01",
+    "requirement_ids": ["FR-019", "FR-002"],
+    "title": "Export respects filters, scope, and field permissions",
+    "objective": "Verify POST /exports with filter parameters exports exactly the permitted, filtered record set; financial columns present only for finance-capable roles.",
+    "priority": "Critical",
+    "type": "API/Security",
+    "preconditions": "Seeded assets across departments; operator (dept A) and auditor sessions.",
+    "test_data": "filters: category=Laptops, status=In Use; export requested by operator (dept A) and auditor",
+    "steps": [
+      "Request export as operator with filters; download result.",
+      "Request same export as auditor; download result.",
+      "Compare row sets to equivalent filtered /assets API responses for each user."
+    ],
+    "expected_result": "Operator export contains only in-scope filtered rows, no finance columns; auditor export contains permitted rows incl. finance columns as decimal strings; row counts match list API truth; export job audited.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-019-02",
+    "requirement_ids": ["FR-019"],
+    "title": "Async export lifecycle — status, download, expiry",
+    "objective": "Verify large exports run async with observable status (queued→processing→completed), download via authorized endpoint, and expired/failed states behave per contract.",
+    "priority": "High",
+    "type": "API/Integration",
+    "preconditions": "Operator session; celery worker running.",
+    "test_data": "export request for all in-scope assets",
+    "steps": [
+      "POST /exports; poll GET /exports/<uuid> until completed.",
+      "GET /exports/<uuid>/download; verify CSV content + headers.",
+      "Verify another user cannot download the file (403/404)."
+    ],
+    "expected_result": "Status transitions observable; completed export downloadable only by requester/authorized roles; file is UTF-8 CSV (BOM documented); expiry policy enforced/documented; failures surface user-safe error with correlation ID.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-018-08",
+    "requirement_ids": ["FR-018", "FR-019", "LAY-1"],
+    "title": "E2E Journey J-7 — bulk import assets from CSV via wizard",
+    "objective": "UI journey through the import wizard: template download, upload, mapping, validate/preview with errors, policy selection, commit, result review.",
+    "priority": "High",
+    "type": "E2E/Journey",
+    "preconditions": "Full stack; Playwright; operator signed in.",
+    "test_data": "10-row CSV: 8 valid, 2 invalid; duplicate-policy 'reject'",
+    "steps": [
+      "Open /imports; download template from wizard.",
+      "Upload CSV; proceed through mapping (defaults accepted).",
+      "Review validation preview: verify 2 invalid rows shown with row numbers + messages.",
+      "Select duplicate policy; commit; watch progress to completion.",
+      "Open /imports/<id> result; verify counts; spot-check one created asset in the register."
+    ],
+    "expected_result": "Wizard steps match design §8.5 (clear labels, error summary, no loss of state on back-navigation); preview accurate; commit awaits backend confirmation; results reconcile with register; evidence screenshots captured.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (Playwright)"
+  }
+]

@@ -1,0 +1,241 @@
+[
+  {
+    "test_id": "TC-FR-003-01",
+    "requirement_ids": ["FR-003"],
+    "title": "Create asset with valid data (happy path)",
+    "objective": "Verify an operator can create an asset with all category-driven required fields; response includes UUID, tag, version=1.",
+    "priority": "Critical",
+    "type": "API/Functional",
+    "preconditions": "operator session + CSRF; reference data seeded (category, status, condition, location, department).",
+    "test_data": "{name: 'QA Laptop 01', category: <Laptops uuid>, status: in_stock, condition: new, department, location, serial_number: 'QA-SN-0001', manufacturer: 'Dell', model: 'Latitude 5540', purchase_price: '1299.99', purchase_currency: 'USD'}",
+    "steps": [
+      "POST /api/v1/assets with payload and Idempotency-Key header.",
+      "Inspect response (201, body).",
+      "GET the returned asset UUID."
+    ],
+    "expected_result": "201 with full asset representation: uuid, server-generated or validated-unique tag, version=1, submitted fields persisted, money represented as {amount, currency} strings; GET returns identical data; created_at/updated_at in UTC ISO 8601 with TZ.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-003-02",
+    "requirement_ids": ["FR-003", "BR-001"],
+    "title": "Asset tag uniqueness enforced",
+    "objective": "Verify duplicate tag submission is rejected with 400/409 DUPLICATE_TAG and no second record is created.",
+    "priority": "Critical",
+    "type": "API/Negative",
+    "preconditions": "Existing asset with known tag T (created in TC-FR-003-01 or seeded).",
+    "test_data": "create payload with tag=T explicitly (if client-supplied tags allowed) or forced collision via API",
+    "steps": [
+      "POST /api/v1/assets with tag=T.",
+      "Verify response and confirm asset count unchanged."
+    ],
+    "expected_result": "Request rejected (400 VALIDATION_FAILED with field_errors.tag, or 409 DUPLICATE_TAG); no duplicate created; tag uniqueness holds for all time including archived records.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-003-03",
+    "requirement_ids": ["FR-003"],
+    "title": "Missing required fields yield per-field validation errors",
+    "objective": "Verify 400 VALIDATION_FAILED with field_errors naming each missing/invalid field per the error envelope contract.",
+    "priority": "Critical",
+    "type": "API/Negative",
+    "preconditions": "operator session.",
+    "test_data": "payload missing name and category; payload with invalid category UUID; payload with purchase_price as float-looking string '12.345' or negative; payload with warranty_end < warranty_start",
+    "steps": [
+      "POST each invalid payload.",
+      "Record status, error.code, error.field_errors keys, correlation_id."
+    ],
+    "expected_result": "Each returns 400 VALIDATION_FAILED; field_errors contains an entry per offending field with user-safe messages; envelope includes correlation_id and retryable=false; nothing persisted.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-003-04",
+    "requirement_ids": ["FR-003"],
+    "title": "Duplicate warning pre-check endpoint",
+    "objective": "Verify POST /assets/:uuid/check-duplicates (or create-time warnings) flags possible duplicates by serial number and manufacturer+model without blocking save.",
+    "priority": "High",
+    "type": "API/Functional",
+    "preconditions": "Existing asset with serial 'QA-SN-0001', manufacturer 'Dell', model 'Latitude 5540'.",
+    "test_data": "candidate payload sharing serial_number; another sharing manufacturer+model only",
+    "steps": [
+      "Invoke the duplicate-check endpoint (or create flow returning warnings) with the candidate data.",
+      "Proceed to save despite warnings."
+    ],
+    "expected_result": "Non-blocking warnings returned listing matched existing assets (tag/uuid + match reason: serial, manufacturer+model); save still succeeds when confirmed; warnings distinguish match types.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-003-05",
+    "requirement_ids": ["FR-003", "FR-025"],
+    "title": "Asset creation is atomic with lifecycle + audit events",
+    "objective": "Verify a single create produces exactly one Asset, one initial LifecycleEvent, and one AuditEvent in one transaction.",
+    "priority": "High",
+    "type": "API/Integration",
+    "preconditions": "operator session; audit/lifecycle query access.",
+    "test_data": "valid create payload",
+    "steps": [
+      "Record counts of assets, lifecycle events, audit events.",
+      "POST create.",
+      "Re-query all three stores for the new asset."
+    ],
+    "expected_result": "Asset + LifecycleEvent(type=created/registered, actor=operator) + AuditEvent(action=create, after=snapshot, before=null, correlation_id matching response) all present; counts each incremented by exactly 1; timestamps consistent.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (pytest)"
+  },
+  {
+    "test_id": "TC-FR-003-06",
+    "requirement_ids": ["FR-003"],
+    "title": "Idempotent create with Idempotency-Key",
+    "objective": "Verify retrying the same create with the same Idempotency-Key returns the original response without creating a duplicate asset.",
+    "priority": "High",
+    "type": "API/Integration",
+    "preconditions": "operator session.",
+    "test_data": "valid payload + Idempotency-Key: qa-key-0001",
+    "steps": [
+      "POST /assets with key qa-key-0001; record response and new asset UUID.",
+      "Repeat the identical POST with the same key.",
+      "Query asset list/count."
+    ],
+    "expected_result": "Second response echoes the first (same UUID/tag/status); only one asset created. A different payload with the same key is rejected or flagged per contract (request_hash mismatch).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-004-01",
+    "requirement_ids": ["FR-004"],
+    "title": "Asset detail returns complete representation",
+    "objective": "Verify GET /assets/:uuid returns identity, category, status, condition, assignment summary (if any), location/department, technical fields, version.",
+    "priority": "Critical",
+    "type": "API/Functional",
+    "preconditions": "seed asset with populated fields.",
+    "test_data": "seeded asset uuid",
+    "steps": ["GET /api/v1/assets/<uuid> as operator.", "Validate JSON structure against OpenAPI schema."],
+    "expected_result": "200 with all fields per contract; datetimes ISO 8601 with TZ; money as decimal string object; version integer present; response validates against OpenAPI component schema.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-004-02",
+    "requirement_ids": ["FR-004", "BR-009"],
+    "title": "Update with correct version succeeds and increments version",
+    "objective": "Verify PATCH with If-Match/version matching current version applies changes and bumps version.",
+    "priority": "Critical",
+    "type": "API/Functional",
+    "preconditions": "asset at version N.",
+    "test_data": "PATCH {description: 'Updated by QA', location: <new uuid>} with If-Match: N (or version in body)",
+    "steps": [
+      "GET asset; note version N.",
+      "PATCH with version N.",
+      "GET asset again."
+    ],
+    "expected_result": "200; changed fields applied; version = N+1; updated_at advanced; unchanged fields untouched.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-004-03",
+    "requirement_ids": ["FR-004", "BR-009"],
+    "title": "Stale version update returns 409 VERSION_CONFLICT",
+    "objective": "Verify optimistic concurrency: a second updater with a stale version is rejected and no partial update occurs.",
+    "priority": "Critical",
+    "type": "API/Concurrency",
+    "preconditions": "asset at version N; two sessions (operator A, manager B).",
+    "test_data": "A and B both read version N; A PATCHes (now N+1); B PATCHes with stale version N",
+    "steps": [
+      "A and B GET the asset (version N).",
+      "A PATCHes with version N — succeeds.",
+      "B PATCHes different changes with version N.",
+      "GET asset as admin."
+    ],
+    "expected_result": "B receives 409 with code VERSION_CONFLICT and user-safe message; asset reflects only A's changes at version N+1; B's fields unchanged.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-004-04",
+    "requirement_ids": ["FR-004", "FR-025"],
+    "title": "Material update audited with before/after",
+    "objective": "Verify PATCH creates an AuditEvent capturing before and after snapshots of changed fields and a lifecycle event where applicable.",
+    "priority": "High",
+    "type": "API/Integration",
+    "preconditions": "asset exists; audit query access.",
+    "test_data": "PATCH changing description and location",
+    "steps": [
+      "PATCH asset.",
+      "Query latest AuditEvent for target_uuid = asset uuid."
+    ],
+    "expected_result": "AuditEvent action=update with before/after JSONB showing old and new values of changed fields; actor, UTC timestamp, correlation_id present; financial field changes excluded from audit for users lacking finance.view? (verify masking policy per design — at minimum event exists and is complete for authorized readers).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-004-05",
+    "requirement_ids": ["FR-004"],
+    "title": "Asset history endpoint returns chronological lifecycle events",
+    "objective": "Verify GET /assets/:uuid/history returns reverse-chronological events with actor, timestamp, type, summary.",
+    "priority": "High",
+    "type": "API/Functional",
+    "preconditions": "asset with create + at least one update.",
+    "test_data": "asset from TC-FR-003-01 with one PATCH applied",
+    "steps": ["GET /api/v1/assets/<uuid>/history.", "Verify ordering and field shape."],
+    "expected_result": "200 with list ordered newest-first; each event has type, actor, occurred_at (UTC ISO), summary; create event present as oldest entry; pagination envelope if list is long.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-004-06",
+    "requirement_ids": ["FR-004"],
+    "title": "UI edit form — 409 conflict prompt",
+    "objective": "Verify the edit page surfaces a clear conflict message when the user's version is stale, offering reload, without losing the user's entered data silently.",
+    "priority": "High",
+    "type": "UI/E2E",
+    "preconditions": "UI running; two browser sessions on the same asset edit page.",
+    "test_data": "sessions A and B editing same asset",
+    "steps": [
+      "A and B open /assets/<uuid>/edit.",
+      "A saves a change successfully.",
+      "B changes a different field and saves.",
+      "Observe B's UI."
+    ],
+    "expected_result": "B sees a conflict notification naming the issue (changes by another user) with an option to reload latest; B's unsaved input is preserved or explicitly acknowledged before discard; no silent overwrite.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-FR-004-07",
+    "requirement_ids": ["FR-004"],
+    "title": "UI create/edit form validation UX",
+    "objective": "Verify client-side validation: required markers, error summary with focus move, per-field errors, values preserved after failed submit, unsaved-changes guard.",
+    "priority": "High",
+    "type": "UI/Usability",
+    "preconditions": "UI running; operator signed in.",
+    "test_data": "empty form submit; partially-filled form; navigation attempt with dirty form",
+    "steps": [
+      "Open /assets/new; submit empty form.",
+      "Observe error summary and focus target.",
+      "Fill name only; submit; observe server-driven field errors (missing category etc.).",
+      "Fill form partially, then attempt to navigate away."
+    ],
+    "expected_result": "Required fields marked with text+symbol; failed submit shows error summary at top and moves focus to it; per-field errors associated with inputs (aria-describedby); entered values preserved; navigating away with unsaved changes triggers a confirmation guard.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (Playwright) + manual spot"
+  },
+  {
+    "test_id": "TC-FR-004-08",
+    "requirement_ids": ["FR-004", "NFR-007"],
+    "title": "Server-side validation cannot be bypassed from the client",
+    "objective": "Verify submitting invalid data directly via API (bypassing UI validation) is rejected identically.",
+    "priority": "High",
+    "type": "API/Security",
+    "preconditions": "operator session.",
+    "test_data": "payloads violating rules that UI enforces: over-length name, invalid date format, negative purchase_price, nonexistent status UUID, script tag in name field",
+    "steps": ["POST/PATCH each payload directly against the API.", "Record responses."],
+    "expected_result": "All rejected with 400 VALIDATION_FAILED and per-field messages; '<script>' input either stored as inert text (and escaped on render) or rejected — never executed; no 500s.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  }
+]

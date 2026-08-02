@@ -1,0 +1,51 @@
+[
+  {
+    "test_id": "TC-FR-029-01",
+    "requirement_ids": ["FR-029"],
+    "title": "Combined activity feed — all event types, reverse chronological",
+    "objective": "Verify GET /assets/:uuid/activity returns a unified feed combining lifecycle, assignment, transfer, maintenance, stocktake, note, and status events, newest first, with actor/timestamp/type/summary.",
+    "priority": "High",
+    "type": "API/Functional",
+    "preconditions": "asset driven through: create → assign → note → maintenance open/close → return (from workflow suites).",
+    "test_data": "asset uuid from end-to-end workflow chain",
+    "steps": [
+      "GET /api/v1/assets/<uuid>/activity.",
+      "Verify presence of each event type performed, ordering newest-first, and required fields per item."
+    ],
+    "expected_result": "Feed contains all performed events exactly once, correctly ordered, each with type, actor, ISO-8601 UTC timestamp, and human summary; paginated if long.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-029-02",
+    "requirement_ids": ["FR-029", "FR-002"],
+    "title": "Activity feed permission filtering",
+    "objective": "Verify sensitive details (financial values, restricted fields) are hidden in feed items for roles without finance.view, and out-of-scope users get 404.",
+    "priority": "High",
+    "type": "API/Security",
+    "preconditions": "asset with maintenance-cost event; operator (no finance.view) and auditor sessions; out-of-scope user.",
+    "test_data": "activity endpoint",
+    "steps": [
+      "GET activity as operator → cost values absent/masked.",
+      "GET activity as auditor → cost visible.",
+      "GET activity as out-of-scope user → 404."
+    ],
+    "expected_result": "Field-level restrictions applied inside feed items; scope rules identical to detail endpoint; no leakage via summaries/details JSON.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-029-03",
+    "requirement_ids": ["FR-029"],
+    "title": "Activity timeline UI on asset history tab",
+    "objective": "Verify the history tab renders the combined feed as an accessible timeline with icons, relative+absolute timestamps, and empty state.",
+    "priority": "Medium",
+    "type": "UI/Functional",
+    "preconditions": "browser + running stack (BLOCKED if unavailable).",
+    "test_data": "asset with rich history; brand-new asset",
+    "steps": ["Open history tab for rich asset; verify timeline entries match API feed.", "Open history for new asset; verify empty state."],
+    "expected_result": "Timeline matches API truth; icon+text per event type; accessible list semantics; empty state informative.",
+    "status": "NOT_RUN",
+    "automation_status": "blocked without browser runner"
+  }
+]

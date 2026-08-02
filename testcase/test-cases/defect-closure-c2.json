@@ -1,0 +1,107 @@
+[
+  {
+    "test_id": "TC-DEF-001-01",
+    "requirement_ids": ["DEF-001", "STK-1", "NFR-005"],
+    "title": "DEF-001 verify — root compose.yaml exists and stack boots (postgres, redis, backend, frontend, celery)",
+    "objective": "Verify the Backend agent delivered the root compose.yaml with all Cycle-2 services and that the documented bootstrap brings up a healthy stack.",
+    "priority": "Critical",
+    "type": "Build/Install",
+    "preconditions": "Clean checkout; Docker available in execution environment (else BLOCKED with justification).",
+    "test_data": "scripts/dev-up.sh; migrate.sh; seed-dev.sh",
+    "steps": [
+      "Verify compose.yaml present at repo root with services: frontend, backend, postgres, redis, celery-worker (+celery-beat/minio if declared).",
+      "Run documented bootstrap; check /api/v1/health/ready 200 and frontend 200.",
+      "Verify non-root containers and health checks configured per design §16."
+    ],
+    "expected_result": "compose.yaml exists and boots the full stack healthy; scripts idempotent; closes DEF-001.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable where Docker available; else BLOCKED"
+  },
+  {
+    "test_id": "TC-DEF-002-01",
+    "requirement_ids": ["DEF-002", "STK-5", "NFR-007"],
+    "title": "DEF-002 verify — root .env.example complete, placeholder-only, .env git-ignored",
+    "objective": "Verify .env.example documents every required env var (secret key, DB, CORS/CSRF origins, API base URL, celery/redis) with placeholders only and .env is git-ignored.",
+    "priority": "High",
+    "type": "Security/RepoHygiene",
+    "preconditions": "Repo access.",
+    "test_data": "file inspection; grep for real-looking secrets",
+    "steps": [
+      "Open .env.example; cross-check vars against settings fail-fast requirements (D-13) and compose service env.",
+      "Verify no real secrets; verify .gitignore covers .env; verify .env untracked."
+    ],
+    "expected_result": ".env.example complete + placeholder-only; .env ignored/untracked; README references it; closes DEF-002.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (file inspection)"
+  },
+  {
+    "test_id": "TC-DEF-003-01",
+    "requirement_ids": ["DEF-003", "D-08", "ADR-004"],
+    "title": "DEF-003/ADR-004 verify — Idempotency-Key landed on asset create + lifecycle endpoints",
+    "objective": "Confirm the Cycle-1 deferral is closed: idempotency implemented and tested for asset create and all Cycle-2 transition endpoints (executed via TC-D08-01…03).",
+    "priority": "Critical",
+    "type": "Traceability/Verification",
+    "preconditions": "TC-D08-01…TC-D08-03 executed.",
+    "test_data": "results of TC-D08 suite; OpenAPI schema headers documentation",
+    "steps": [
+      "Verify TC-D08-01…03 results are PASSED (or file defects).",
+      "Verify OpenAPI documents Idempotency-Key header on the relevant POST operations."
+    ],
+    "expected_result": "All idempotency tests pass; contract documents the header; ADR-004 marked closed; closes DEF-003.",
+    "status": "NOT_RUN",
+    "automation_status": "derived (depends on TC-D08 suite)"
+  },
+  {
+    "test_id": "TC-DEF-004-01",
+    "requirement_ids": ["DEF-004", "ADR-003", "STK-2"],
+    "title": "DEF-004/ADR-003 verify — backend/uv.lock committed and reproducible",
+    "objective": "Verify uv.lock is committed at backend/ and dependency resolution is reproducible (or a recorded ADR explains continued absence).",
+    "priority": "High",
+    "type": "Build/QualityGate",
+    "preconditions": "Repo access; uv available or Docker build.",
+    "test_data": "backend/uv.lock; pyproject.toml",
+    "steps": [
+      "Verify backend/uv.lock exists and is tracked.",
+      "Verify locked versions satisfy pyproject ranges; verify Dockerfile/CI installs from the lock (frozen) where documented."
+    ],
+    "expected_result": "uv.lock committed, consistent with pyproject; install path uses the lock; closes DEF-004 (or ADR updated with approved rationale).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (file inspection)"
+  },
+  {
+    "test_id": "TC-DEF-006-01",
+    "requirement_ids": ["DEF-006", "FR-026", "BR-004"],
+    "title": "DEF-006 verify — reference-data DELETE semantics: deactivate-in-use, delete-only-unused, audited",
+    "objective": "Verify the corrected DELETE/deactivate behavior for reference data: in-use values are deactivated (not deleted), unused values may be deleted, FK PROTECT honored, all audited.",
+    "priority": "Critical",
+    "type": "API/Functional",
+    "preconditions": "Admin session; a category/status/location referenced by assets; an unused reference-data row.",
+    "test_data": "in-use location L-used; unused supplier S-unused",
+    "steps": [
+      "DELETE (or deactivate) L-used → verify it becomes inactive but remains referenced; assets still resolve it.",
+      "Verify inactive values excluded from create/edit form option lists but retained on existing records/history.",
+      "DELETE S-unused → verify actual removal permitted (or documented uniform-deactivate policy).",
+      "Verify audit events for both actions; verify non-admin cannot perform either (403)."
+    ],
+    "expected_result": "BR-004 honored: in-use values never hard-deleted (deactivate instead); no broken references; option lists filter inactive; audit trail complete; closes DEF-006.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-DEF-005-01",
+    "requirement_ids": ["DEF-005", "NFR-007", "STK-4"],
+    "title": "Cycle-1 npm-audit critical dev dependency resolved",
+    "objective": "Verify the critical npm-audit finding (transitive dev dependency) from Cycle 1 is fixed or has a recorded risk decision; npm audit shows no unresolved criticals.",
+    "priority": "High",
+    "type": "Security/Dependency",
+    "preconditions": "Frontend deliverables; npm available.",
+    "test_data": "npm audit output (production + dev noted separately)",
+    "steps": [
+      "Run npm audit in frontend/; capture JSON/text output.",
+      "If findings remain, verify a documented risk decision (dev-only, non-shipped) exists in frontend README/ASSUMPTIONS."
+    ],
+    "expected_result": "No unresolved critical vulnerabilities without recorded risk decision; production dependency tree clean of criticals.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (npm audit via allowlisted command if available)"
+  }
+]

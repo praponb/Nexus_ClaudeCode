@@ -1,0 +1,52 @@
+[
+  {
+    "test_id": "TC-FR-028-01",
+    "requirement_ids": ["FR-028"],
+    "title": "Data-quality rules flag missing required data and invalid references",
+    "objective": "Verify the rule engine flags assets with missing required fields (per category), invalid references, and inconsistent lifecycle values, classified as errors vs warnings.",
+    "priority": "High",
+    "type": "API/Functional",
+    "preconditions": "seed or create: asset missing serial where category requires it; asset with expired assignment inconsistency; complete clean asset.",
+    "test_data": "data-quality evaluation endpoint or asset data_quality_status field",
+    "steps": [
+      "Trigger/refresh data-quality evaluation (endpoint or on-save).",
+      "Verify flagged issues list with rule code, severity (error|warning), asset reference, message.",
+      "Verify clean asset has no flags."
+    ],
+    "expected_result": "Issues detected per rules with error/warning classification; asset data_quality_status reflects state; no false positives on clean asset.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-028-02",
+    "requirement_ids": ["FR-028"],
+    "title": "Possible-duplicate detection feeds work queue",
+    "objective": "Verify possible duplicates (serial, manufacturer+model) appear in the data-quality work queue with match reasons.",
+    "priority": "Medium",
+    "type": "API/Functional",
+    "preconditions": "two assets sharing serial number; two sharing manufacturer+model only.",
+    "test_data": "work queue endpoint (per delivered contract)",
+    "steps": ["Query the data-quality work queue.", "Verify both duplicate pairs listed with match reasons and links to both assets."],
+    "expected_result": "Queue lists duplicates with reasons and asset references; counts accurate; scoped to user's permissions.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-028-03",
+    "requirement_ids": ["FR-028", "FR-025"],
+    "title": "Resolving an issue preserves audit history",
+    "objective": "Verify resolving a data-quality issue (fix data or mark reviewed) updates the queue while the resolution and underlying data change are both audited.",
+    "priority": "Medium",
+    "type": "API/Integration",
+    "preconditions": "flagged issue from TC-FR-028-01; operator session.",
+    "test_data": "fix the underlying data (add missing serial) or resolution action per contract",
+    "steps": [
+      "Fix underlying data via normal PATCH (with version).",
+      "Verify issue cleared/marked resolved in queue.",
+      "Verify audit events exist for the data fix (and resolution action if distinct)."
+    ],
+    "expected_result": "Queue reflects resolution; audit trail complete; issue history not erased.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  }
+]

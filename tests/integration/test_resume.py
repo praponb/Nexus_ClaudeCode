@@ -39,6 +39,17 @@ async def test_resume_continues_after_simulated_crash_without_redoing_completed_
     assert run_id is not None
     run_dir = workspace / "runs" / run_id
 
+    # The failure must be attributed to the state that actually raised
+    # (CYCLE_2_IMPLEMENT_AND_TEST), not the last state that had already
+    # completed successfully (TEAM_LEAD_REVIEW_1) -- regression test for a
+    # bug where mark_failed() used state_doc.current_state, which is only
+    # updated by mark_done() and so still pointed at the prior state.
+    assert orchestrator.state_doc is not None
+    assert orchestrator.state_doc.history[-1]["state"] == "CYCLE_2_IMPLEMENT_AND_TEST"
+    assert orchestrator.state_doc.history[-1]["status"] == "failed"
+    assert not orchestrator.state_doc.is_done("CYCLE_2_IMPLEMENT_AND_TEST")
+    assert orchestrator.state_doc.is_done("TEAM_LEAD_REVIEW_1")
+
     cycle1_summary_path = run_dir / "cycle-1" / "frontend-summary.md"
     assert cycle1_summary_path.exists()
     mtime_before_resume = cycle1_summary_path.stat().st_mtime_ns

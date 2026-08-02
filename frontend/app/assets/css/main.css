@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+/* -------------------------------------------------------------------------
+ * Dark theme design tokens (layout.md §5.2). Single source of truth for the
+ * palette; components must reference semantic utilities, never raw hex.
+ * ------------------------------------------------------------------------- */
+@theme {
+  --color-canvas: #090d14;
+  --color-sidebar: #0d131d;
+  --color-surface: #121a26;
+  --color-raised: #182231;
+  --color-input: #0e1622;
+  --color-hover: #1d2a3a;
+  --color-border: #263445;
+  --color-border-strong: #3a4a5e;
+
+  --color-ink: #f3f6fa;
+  --color-ink-secondary: #b8c4d1;
+  --color-muted: #8795a6;
+  --color-faint: #667384;
+
+  --color-accent: #5ea2ff;
+  --color-accent-hover: #83b7ff;
+  --color-on-accent: #061221;
+  --color-focus: #8cc8ff;
+
+  --color-success: #4fd1a1;
+  --color-warning: #f4c95d;
+  --color-danger: #ff6b78;
+  --color-info: #63b3ed;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    scrollbar-color: var(--color-border-strong) var(--color-canvas);
+  }
+
+  body {
+    @apply bg-canvas text-ink font-sans antialiased;
+  }
+
+  ::selection {
+    background-color: color-mix(in srgb, var(--color-accent) 35%, transparent);
+  }
+
+  /* Strong, always-visible focus indicator (WCAG 2.2 AA, layout.md §22). */
+  *:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  input,
+  select,
+  textarea,
+  button {
+    font: inherit;
+  }
+}
+
+/* Reduced motion (layout.md §23). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Print (layout.md §27): light background, dark text, no dark chrome. */
+@media print {
+  html,
+  body {
+    background: #ffffff !important;
+    color: #111111 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}

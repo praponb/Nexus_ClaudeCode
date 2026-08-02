@@ -1,0 +1,107 @@
+[
+  {
+    "test_id": "TC-FR-029-01",
+    "requirement_ids": ["FR-029"],
+    "title": "Combined activity feed — all permitted event types, reverse chronological",
+    "objective": "Verify GET /assets/:uuid/activity merges lifecycle, assignment, transfer, maintenance, stocktake, comment, and status events into one reverse-chronological feed with actor, timestamp, type, summary.",
+    "priority": "High",
+    "type": "API/Integration",
+    "preconditions": "Asset exercised through create → assign → transfer → maintenance → stocktake observation → note.",
+    "test_data": "asset AF1 run through each workflow",
+    "steps": [
+      "Perform each workflow on AF1.",
+      "GET /assets/AF1/activity; verify every event type present, ordered newest-first, each with actor/timestamp/type/summary.",
+      "Compare against /assets/AF1/history for consistency."
+    ],
+    "expected_result": "Feed complete and correctly ordered; no duplicate/missing events; timestamps UTC; correlation IDs present where applicable; UI history tab renders the same feed.",
+    "status": "PASSED",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-029-02",
+    "requirement_ids": ["FR-029", "FR-002", "NFR-008"],
+    "title": "Activity feed hides sensitive details by permission",
+    "objective": "Verify feed entries omit financial details (maintenance cost, purchase price) and restricted personal data for roles without permission, while finance-capable roles see them.",
+    "priority": "High",
+    "type": "API/Security",
+    "preconditions": "AF1 includes a maintenance event with cost and an assignment to an employee.",
+    "test_data": "operator session (no finance.view); auditor session (finance.view)",
+    "steps": [
+      "GET activity as operator; scan summaries/details for cost amounts.",
+      "GET activity as auditor; verify cost visible."
+    ],
+    "expected_result": "No financial values in operator feed payloads (including nested details JSON); auditor view complete; no leakage via summaries or error messages.",
+    "status": "BLOCKED",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-028-01",
+    "requirement_ids": ["FR-028"],
+    "title": "Data-quality rules flag missing/invalid/inconsistent data (v1)",
+    "objective": "Verify the v1 rule engine flags: missing required fields, invalid references, possible duplicates, expired assignments, inconsistent lifecycle values; errors vs warnings distinguished. GET /data-quality/issues returns the queue.",
+    "priority": "High",
+    "type": "API/Functional",
+    "preconditions": "Seeded/created assets exhibiting each issue class (seed data quality fixtures or crafted via API where validation allows drafts). Mandatory backend tests land in Cycle 3 (design §2.5).",
+    "test_data": "asset missing serial (if required by category); asset with expired expected_return; duplicate serial pair; status/assignment inconsistency",
+    "steps": [
+      "GET /api/v1/data-quality/issues as authorized user.",
+      "Verify each seeded issue flagged with rule id, severity (error vs warning), and asset reference."
+    ],
+    "expected_result": "Each seeded issue detected and classified per documented rules; severity mapping correct; flags scope-filtered; no false positives on clean seeded assets (spot check).",
+    "status": "BLOCKED",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-028-02",
+    "requirement_ids": ["FR-028", "BR-003"],
+    "title": "Data-quality work queue — resolution preserves audit history",
+    "objective": "Verify flagged issues appear in a resolvable work queue; POST /data-quality/issues/:uuid/resolve (or fixing underlying data) clears the flag while preserving the full audit trail.",
+    "priority": "Medium",
+    "type": "API + UI",
+    "preconditions": "Assets with open data-quality flags; operator/manager session.",
+    "test_data": "one fixable issue (add missing field), one acknowledged warning",
+    "steps": [
+      "Open the work queue (API or UI per delivery); verify flags listed with severity.",
+      "Fix the underlying data via normal edit (version-checked) or the resolve endpoint; verify flag clears on re-evaluation.",
+      "Verify audit history retains the original state + correction events."
+    ],
+    "expected_result": "Queue accurate and permission-scoped; resolution via normal audited mutations; history immutable and complete; UI queue states (loading/empty) correct.",
+    "status": "BLOCKED",
+    "automation_status": "automatable (API) + manual/Playwright UI"
+  },
+  {
+    "test_id": "TC-FR-020-07",
+    "requirement_ids": ["FR-020", "NFR-004"],
+    "title": "Dashboard completion — full KPI set, scope-correct, links to filtered lists, refreshed timestamp",
+    "objective": "Verify dashboard summary includes all Cycle-2/3 KPIs (totals, by status, by category, assigned/unassigned, overdue returns, maintenance due, warranty expiring, missing, recent activity), scoped per user, with working links and last-refreshed timestamp. (Renumbered from duplicate TC-FR-020-01 in Cycle 3 design phase; complements dashboard.json TC-FR-020-04.)",
+    "priority": "High",
+    "type": "API + UI",
+    "preconditions": "Seeded data incl. overdue assignment, due maintenance, expiring warranty, missing asset; admin + dept-scoped deptmgr sessions. Mandatory backend KPI tests land in Cycle 3 (design §2.5).",
+    "test_data": "ground-truth counts computed via filtered /assets queries",
+    "steps": [
+      "GET /dashboard/summary as admin and as deptmgr; verify KPI counts against ground truth per scope (no cross-scope totals for deptmgr).",
+      "Open dashboard UI; click each indicator; verify landing list is correctly pre-filtered.",
+      "Verify last-refreshed timestamp renders; verify tasks/activity panels per Cycle-2/3 scope."
+    ],
+    "expected_result": "Counts reconcile exactly per scope; links deep-link to filtered lists (URL query params); timestamp displayed; dashboard p95 ≤3s on seeded volume (smoke measurement recorded); accessible ranked lists/table fallback present (D-15).",
+    "status": "BLOCKED",
+    "automation_status": "automatable (API + Playwright)"
+  },
+  {
+    "test_id": "TC-NFR-004-01",
+    "requirement_ids": ["NFR-004"],
+    "title": "Performance smoke — dashboard/search/detail latencies on seeded volume",
+    "objective": "Smoke-measure latencies (repeated samples) for dashboard summary, filtered asset search, and asset detail; record numbers. Cycle 3 extends to planning-volume run (see hardening-c3.json TC-NFR-006-01).",
+    "priority": "Medium",
+    "type": "Performance/Smoke",
+    "preconditions": "Running seeded stack; timing harness (pytest/Playwright/curl loop).",
+    "test_data": "20 samples per endpoint; warm and cold first-hit noted",
+    "steps": [
+      "Measure GET /dashboard/summary, GET /assets?<typical filter>, GET /assets/<uuid> repeatedly; record min/median/max.",
+      "Verify no endpoint degrades egregiously (targets: dashboard ≤3s, search/detail ≤2s)."
+    ],
+    "expected_result": "Measured latencies within targets (recorded as evidence; full planning-volume perf test is TC-NFR-006-01); no obvious N+1 regressions (backend assertNumQueries tests remain green).",
+    "status": "BLOCKED",
+    "automation_status": "automatable"
+  }
+]

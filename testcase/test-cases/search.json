@@ -1,0 +1,138 @@
+[
+  {
+    "test_id": "TC-FR-005-01",
+    "requirement_ids": ["FR-005"],
+    "title": "Global search — exact tag match ranked first",
+    "objective": "Verify /search/assets?q=<exact tag> returns the exact-tagged asset as the first result.",
+    "priority": "Critical",
+    "type": "API/Functional",
+    "preconditions": "seeded assets; one with known tag T and others with similar names.",
+    "test_data": "q = exact tag T; q = partial tag",
+    "steps": [
+      "GET /api/v1/search/assets?q=<T> as operator.",
+      "GET /api/v1/search/assets?q=<partial of T>.",
+      "Inspect ordering of results."
+    ],
+    "expected_result": "Exact tag match appears first; partial search returns ranked matches across tag/serial/name/model; results scoped to user permissions; response shape consistent with list envelope or documented search contract.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-005-02",
+    "requirement_ids": ["FR-005"],
+    "title": "Search across fields — serial, name, model, custodian, location",
+    "objective": "Verify global search matches assets by serial number, name, model, custodian name, and location per spec.",
+    "priority": "High",
+    "type": "API/Functional",
+    "preconditions": "seed asset with distinctive serial/name/model; an assigned custodian and location with distinctive names.",
+    "test_data": "queries: serial substring, name substring, model substring, custodian surname, location name",
+    "steps": ["Run each query against /search/assets (or /assets?search=).", "Verify the target asset is present in each result set."],
+    "expected_result": "Each query returns the expected asset; no matches for unrelated gibberish query (empty result set, not error).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-005-03",
+    "requirement_ids": ["FR-005"],
+    "title": "List filters — status, category, department, condition combined",
+    "objective": "Verify server-side filters on /assets combine correctly (AND semantics) and respect scope.",
+    "priority": "High",
+    "type": "API/Functional",
+    "preconditions": "seeded assets across multiple statuses/categories.",
+    "test_data": "filter combos: status=in_stock; category=<uuid>; status+category; condition+department",
+    "steps": [
+      "GET /api/v1/assets?status=... for each combo as admin.",
+      "Verify every returned row satisfies all filter criteria.",
+      "Repeat one combo as deptmgr and verify scope intersection."
+    ],
+    "expected_result": "All results match every applied filter; count envelope consistent; dept-scoped user sees only in-scope matches; invalid filter values yield 400 with field_errors, not 500.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-005-04",
+    "requirement_ids": ["FR-005"],
+    "title": "Sorting server-side on supported columns",
+    "objective": "Verify ordering parameter sorts ascending/descending on name, tag, created_at, updated_at; invalid sort fields rejected or ignored safely.",
+    "priority": "Medium",
+    "type": "API/Functional",
+    "preconditions": "seeded assets.",
+    "test_data": "ordering=name, ordering=-name, ordering=tag, ordering=-created_at, ordering=bogus_field",
+    "steps": ["GET /assets with each ordering value; verify result ordering.", "Send bogus ordering value."],
+    "expected_result": "Results correctly ordered for supported fields (verify programmatically adjacent pairs); bogus field returns 400 or is ignored with default order — never 500.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-005-05",
+    "requirement_ids": ["FR-005", "D-09"],
+    "title": "Pagination envelope, defaults, and max page_size",
+    "objective": "Verify pagination contract: envelope {count, next, previous, results}; default page_size 25; page_size capped at 100.",
+    "priority": "High",
+    "type": "API/Contract",
+    "preconditions": ">25 seeded assets (seed provides ~200).",
+    "test_data": "no params; ?page=2; ?page_size=5; ?page_size=10000; ?page=99999",
+    "steps": [
+      "GET /assets with no params — verify envelope and 25 results.",
+      "GET page=2 — verify next/previous links and distinct results.",
+      "GET page_size=5 — verify 5 results and correct count.",
+      "GET page_size=10000 — verify capped at 100 (or 400 per contract).",
+      "GET page=99999 — verify behavior (empty results or 404 per contract)."
+    ],
+    "expected_result": "Envelope keys present and typed correctly; default 25; over-max page_size handled per contract (clamp to 100 or 400 VALIDATION_FAILED); out-of-range page yields empty results or documented 404 — never 500; no duplicate or missing rows across sequential pages.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-005-06",
+    "requirement_ids": ["FR-005"],
+    "title": "Filter/sort/pagination state synced to URL query params",
+    "objective": "Verify the asset register reflects filters, sort, and page in the URL and restores state on reload/share.",
+    "priority": "High",
+    "type": "UI/Functional",
+    "preconditions": "UI running; operator signed in.",
+    "test_data": "apply status filter + sort by name desc + page 2",
+    "steps": [
+      "On /assets, apply a status filter, change sort, go to page 2.",
+      "Observe URL query params.",
+      "Copy URL, open in new tab/incognito-after-login.",
+      "Verify identical view state restored.",
+      "Use browser Back after changing filters."
+    ],
+    "expected_result": "URL contains filter/sort/page params; shared URL reproduces the exact view; Back/Forward navigates filter history correctly; no state lost on reload.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-FR-005-07",
+    "requirement_ids": ["FR-005"],
+    "title": "Global search box UI — keyboard navigable suggestions",
+    "objective": "Verify top-bar search shows suggestions, exact-tag-first, fully keyboard operable, and unknown terms yield a clear empty state.",
+    "priority": "Medium",
+    "type": "UI/Accessibility",
+    "preconditions": "UI running; operator signed in.",
+    "test_data": "exact tag query; name substring; gibberish 'zzzqqq'",
+    "steps": [
+      "Focus global search via keyboard; type a query.",
+      "Arrow-key through suggestions; press Enter on one.",
+      "Search gibberish; observe empty state; press Escape."
+    ],
+    "expected_result": "Suggestions appear with exact tag first; arrow keys move visible focus (aria-activedescendant); Enter opens the asset detail; gibberish shows accessible 'no results' message; Escape closes suggestion list with focus restored to input.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-FR-005-08",
+    "requirement_ids": ["FR-005", "NFR-004"],
+    "title": "Search/list performance smoke",
+    "objective": "Smoke-check that filtered asset search responds within the p95 ≤2s target at seed volume (~200 assets) with wide margin.",
+    "priority": "Medium",
+    "type": "Performance/Smoke",
+    "preconditions": "seeded stack; timing tool (curl -w or pytest timing).",
+    "test_data": "10 representative queries (search + filtered list + detail)",
+    "steps": ["Execute each query 3 times warm; record response times.", "Compute rough average/max."],
+    "expected_result": "All responses well under 2s at seed volume (expect <500ms); no query-time errors; results consistent across repeats. (Full-volume perf test is Cycle 3.)",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  }
+]

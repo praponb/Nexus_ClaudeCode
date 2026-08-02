@@ -27,7 +27,11 @@ def test_validate_reports_missing_required_files(
 def test_validate_reports_missing_api_key(
     fixtures_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.delenv("MODEL_API_KEY", raising=False)
+    # Force-empty rather than delenv: env vars take precedence over a real
+    # .env file that may exist in the repo root for actual usage, so
+    # deleting the process env var alone wouldn't stop Settings from
+    # falling back to a real key configured there.
+    monkeypatch.setenv("MODEL_API_KEY", "")
     exit_code = main(["validate", "--input-dir", str(fixtures_dir / "requirements_valid")])
     assert exit_code == 1
 

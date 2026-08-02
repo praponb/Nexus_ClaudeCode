@@ -1,0 +1,128 @@
+[
+  {
+    "test_id": "TC-FR-023-01",
+    "requirement_ids": ["FR-023"],
+    "title": "Notification created for catalog events with correct recipient + deep link",
+    "objective": "Verify catalog events (assignment to custodian, overdue return, approval requested/decided, stocktake opened/due, warranty expiring, maintenance due, exception reported) create in-app notifications for the correct recipients with title/body/link.",
+    "priority": "Critical",
+    "type": "API/Integration",
+    "preconditions": "Notification system delivered; ability to trigger at least 3 catalog events (assign asset to employee; create approval request; overdue assignment fixture).",
+    "test_data": "assignment to employee E; approval request for approver A; overdue assignment fixture",
+    "steps": [
+      "Trigger each event.",
+      "GET /api/v1/notifications as the expected recipient; verify entry (type, title, body, link, read_at null, created_at UTC).",
+      "GET /notifications as an unrelated user; verify absence."
+    ],
+    "expected_result": "Each event notifies exactly the documented recipients (no fan-out leakage); link points to an authorized deep link (asset/approval/stocktake detail); payload contains no sensitive data beyond the recipient's permission.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-023-02",
+    "requirement_ids": ["FR-023"],
+    "title": "Dedupe — repeated identical events do not spam unread duplicates",
+    "objective": "Verify the dedupe_key partial-unique mechanism (unique where read_at IS NULL): repeating the same event for the same recipient updates/reuses the unread notification instead of stacking duplicates.",
+    "priority": "High",
+    "type": "API/Integration",
+    "preconditions": "An event type that can fire repeatedly (e.g., overdue evaluation or repeated exception reports).",
+    "test_data": "trigger same event twice for recipient R",
+    "steps": [
+      "Trigger event; count R's unread notifications of that type.",
+      "Trigger the identical event again; recount.",
+      "Mark read; retrigger; verify a new notification may now be created."
+    ],
+    "expected_result": "Unread duplicates prevented (count stable or documented refresh behavior); after read, a new occurrence creates a fresh entry; no unique-constraint 500s under concurrent triggers.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-023-03",
+    "requirement_ids": ["FR-023"],
+    "title": "Mark-as-read and read state isolation between users",
+    "objective": "Verify POST /notifications/:uuid/read sets read_at for the owner only; other users get 404; read state does not affect the dedupe slot of other recipients.",
+    "priority": "High",
+    "type": "API/Functional",
+    "preconditions": "Recipient R with unread notification N; another user U.",
+    "test_data": "read request on N by R and by U",
+    "steps": [
+      "As U: POST read on N → expect 404 (or 403 per contract; record).",
+      "As R: POST read → 200/204; GET list shows read_at set.",
+      "Re-POST read (idempotency) → stable response."
+    ],
+    "expected_result": "Ownership enforced; read_at persisted (UTC); repeat read idempotent; unread count endpoints/badges consistent after read.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-023-04",
+    "requirement_ids": ["FR-023", "NFR-008"],
+    "title": "Preferences — optional notifications disableable; mandatory compliance non-disableable",
+    "objective": "Verify GET/PATCH /notifications/preferences: users can disable optional event types and no longer receive them, while mandatory compliance types cannot be disabled (400/ignored per contract) and still arrive.",
+    "priority": "High",
+    "type": "API/Functional",
+    "preconditions": "Preference catalog delivered; user U with default prefs.",
+    "test_data": "PATCH disable optional type 'warranty_expiring'; PATCH attempt disable mandatory type (per catalog)",
+    "steps": [
+      "GET preferences — record catalog with mandatory/optional flags.",
+      "Disable an optional type; trigger its event; verify no notification to U.",
+      "Attempt to disable a mandatory type; verify rejection or documented ignore; trigger event; verify notification still arrives.",
+      "Re-enable optional type; trigger; verify delivery resumes."
+    ],
+    "expected_result": "Optional suppression effective; mandatory enforcement per spec (non-disableable); preference changes take effect without admin; prefs scoped per user.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-023-05",
+    "requirement_ids": ["FR-023", "NFR-008"],
+    "title": "Email dispatch when SMTP configured; failures logged without confidential content",
+    "objective": "Verify that with SMTP configured, notifications also dispatch email (documented types); with SMTP failure, the in-app notification is retained and the failure is logged without confidential content (no credentials/body secrets).",
+    "priority": "Medium",
+    "type": "Integration/Config",
+    "preconditions": "SMTP stub (e.g., local debug server or documented test backend) OR documented eager/console email backend in test settings.",
+    "test_data": "trigger notifiable event with email enabled; then with SMTP broken/misconfigured",
+    "steps": [
+      "Trigger event with working SMTP config; verify email captured by stub (recipient, subject, no sensitive over-disclosure).",
+      "Break SMTP (bad host); retrigger; verify in-app notification still created and failure logged (inspect log record: no password/secret, no full confidential body)."
+    ],
+    "expected_result": "Email sent only when configured; failure degrades gracefully (in-app retained, logged with correlation ID); logs mask credentials and confidential content per §13; if SMTP testing is impossible in QA env → MANUAL with the stub procedure documented.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable where SMTP stub available; else MANUAL"
+  },
+  {
+    "test_id": "TC-FR-023-06",
+    "requirement_ids": ["FR-023", "FR-002"],
+    "title": "Deep links are authorization-checked on click-through",
+    "objective": "Verify notification deep links land on the target only when the clicking user still has permission; revoked/out-of-scope targets redirect to 403/404 UX, never leak data.",
+    "priority": "Medium",
+    "type": "API + UI/Security",
+    "preconditions": "Notification with deep link to asset X for user R; then rescope R (or use a user who received a stale link).",
+    "test_data": "deep link URL from notification payload",
+    "steps": [
+      "API: GET the deep-link target as authorized R → 200.",
+      "After permission change (or as a different user): GET target → 404/403.",
+      "UI (if browser available): click link in notification center; verify re-auth + landing behavior."
+    ],
+    "expected_result": "Links never bypass authorization; revoked access yields safe 403/404 handling; no stale data rendered client-side.",
+    "status": "NOT_RUN",
+    "automation_status": "API part automatable; UI part Playwright"
+  },
+  {
+    "test_id": "TC-FR-023-07",
+    "requirement_ids": ["FR-023", "LAY-1", "NFR-003"],
+    "title": "E2E — notification center: list, unread badge, mark read, preferences UI",
+    "objective": "UI journey: trigger a notification (assign asset to signed-in employee), see unread badge on bell, open /notifications, mark read (badge clears), adjust a preference toggle.",
+    "priority": "Medium",
+    "type": "E2E/Journey",
+    "preconditions": "Full stack; Playwright; operator + employee credentials.",
+    "test_data": "assignment event for employee",
+    "steps": [
+      "As operator: assign asset to employee E.",
+      "As E: verify bell unread count; open center; verify entry content + link.",
+      "Mark read; verify badge clears without reload errors.",
+      "Open preferences; toggle an optional type off/on; verify persistence after reload."
+    ],"expected_result": "Center matches API truth; badge/count live updates via accessible live region; preferences persist; keyboard operable; evidence captured. (Browser-unavailable → BLOCKED.)",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (Playwright)"
+  }
+]

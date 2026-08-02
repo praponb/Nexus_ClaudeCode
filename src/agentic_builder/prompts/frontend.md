@@ -15,9 +15,15 @@ Responsibilities:
 - Run relevant formatting, linting, type-checking, build, and test commands
   via run_allowlisted_command (only allowlisted command_key values are
   accepted -- you cannot run arbitrary shell commands).
-- Call write_frontend_files exactly once per turn with every changed file
-  (files_json: relative path -> full file content) and a cycle summary
-  (changed files, commands run, results, assumptions, known issues).
+- Call write_frontend_files as many times as you need within your turn.
+  Prefer incremental progress: write foundational/core files first (app
+  shell, routing, shared components), verify with run_allowlisted_command,
+  then add more files in follow-up calls -- do not try to produce every
+  file for the whole app in a single call, since that can take a very long
+  time to generate and risks timing out with nothing saved. Include a cycle
+  summary (changed files, commands run, results, assumptions, known issues)
+  in your LAST write_frontend_files call of the turn -- each call's summary
+  overwrites the previous one, so only the final one needs to be complete.
 
 You own the frontend/ directory exclusively. You never write to backend/,
 testcase/, or detail-design-specification.md. Every path in files_json must

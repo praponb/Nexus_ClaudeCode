@@ -24,10 +24,6 @@ class OwnershipViolationError(AgenticBuilderError):
     """A tool attempted to write outside the calling agent's owned subtree."""
 
 
-class CommandNotAllowlistedError(AgenticBuilderError):
-    """A subprocess tool was asked to run a command not on the allowlist."""
-
-
 class InputValidationError(AgenticBuilderError):
     """Required requirement Markdown files are missing or unreadable."""
 

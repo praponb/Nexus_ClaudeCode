@@ -15,7 +15,9 @@ adk-venv/
 # Env / secrets
 .env
 .env.*
-!.env.example
+# Checked-in placeholder templates (no real secrets) -- see ADR-006.
+!backend/.env
+!scripts/templates/.env
 
 # Tooling caches
 .mypy_cache/

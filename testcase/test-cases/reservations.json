@@ -1,0 +1,75 @@
+[
+  {
+    "test_id": "TC-FR-010-03",
+    "requirement_ids": ["FR-010", "FR-002"],
+    "title": "GET /reservations — scoped list with status/asset/requester filters and pagination",
+    "objective": "Verify the new list endpoint (Rev 1.2) returns reservations scoped to the caller's visibility, supports filters (status, asset, requester) and the D-09 pagination envelope.",
+    "priority": "Critical",
+    "type": "API/Functional",
+    "preconditions": "Reservations existing across two departments and statuses (requested/confirmed/checked_out/returned/cancelled); operator dept-A, operator dept-B, admin sessions.",
+    "test_data": "GET /api/v1/reservations?status=confirmed; ?asset=<uuid>; ?requester=<uuid>",
+    "steps": [
+      "List as admin with each filter; verify membership.",
+      "List as operator dept-A; verify only dept-A-scoped (or own/custody) reservations returned.",
+      "Verify envelope {count,next,previous,results} and page traversal without duplicates."
+    ],
+    "expected_result": "Server-side filtering correct; scope predicate identical to asset visibility rules (cross-scope records never serialized); pagination consistent; invalid filter values → 400, never 500.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-010-04",
+    "requirement_ids": ["FR-010"],
+    "title": "Overdue identification — overdue=true filter returns exactly the overdue set",
+    "objective": "Verify overdue=true returns precisely reservations whose end_at has passed while still active (confirmed/checked_out per documented rule), with correct overdue duration, completing FR-010.",
+    "priority": "Critical",
+    "type": "API/Functional",
+    "preconditions": "Fixtures: R1 confirmed ending yesterday (overdue), R2 checked_out ending last week (overdue per rule), R3 confirmed ending tomorrow (not overdue), R4 returned last week (closed, not overdue).",
+    "test_data": "GET /api/v1/reservations?overdue=true; ground-truth set from fixtures",
+    "steps": [
+      "Query overdue=true; compare returned set to fixtures R1/R2 only.",
+      "Verify response exposes end_at/status sufficient to compute overdue duration (or a provided overdue_days field).",
+      "Verify overdue items are also surfaced where documented (dashboard KPI linkage if wired)."
+    ],
+    "expected_result": "Returned set == {R1, R2} exactly; closed/future reservations excluded; rule for which active statuses count as overdue is documented and consistent between list filter and any dashboard badge.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-010-05",
+    "requirement_ids": ["FR-010", "LAY-1", "NFR-002"],
+    "title": "/reservations page — list, filters, overdue highlighting (icon+text), responsive",
+    "objective": "UI: the new /reservations page lists scoped reservations with status badges, filter bar incl. overdue toggle, and renders correctly at desktop and mobile widths; overdue items visually flagged not-by-color-alone.",
+    "priority": "High",
+    "type": "UI/E2E",
+    "preconditions": "Full stack; Playwright; operator signed in; seeded overdue + current reservations.",
+    "test_data": "viewports 1440 and 375; overdue fixture",
+    "steps": [
+      "Open /reservations at 1440px; verify table/cards, badges, filter application, empty state on no-match filter.",
+      "Toggle overdue filter; verify only overdue rows and their flag (icon+text).",
+      "Repeat at 375px; verify no horizontal scroll and usable actions."
+    ],
+    "expected_result": "Page matches API truth; overdue flag per layout §5.3 (not color alone); URL query params sync filters; nav item present per §6 sidebar update. (Browser-unavailable → BLOCKED.)",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-FR-010-06",
+    "requirement_ids": ["FR-010"],
+    "title": "Regression — reservation lifecycle rules unchanged by list addition",
+    "objective": "Re-verify core C2 guarantees after the C3 list/page work: overlap → 409 RESERVATION_CONFLICT (contract clarification 11), checkout creates single assignment, double-checkout conflict, idempotent reserve replay.",
+    "priority": "High",
+    "type": "API/Regression",
+    "preconditions": "Reservable asset; operator session; C2 backend suite green as baseline.",
+    "test_data": "overlapping reserve payloads; checkout twice; Idempotency-Key replay on reserve",
+    "steps": [
+      "Create reservation; overlap → expect 409 RESERVATION_CONFLICT.",
+      "Checkout; repeat checkout → 409.",
+      "Replay reserve with same Idempotency-Key → same response, one reservation.",
+      "Confirm full backend pytest suite still green."
+    ],
+    "expected_result": "All C2 behaviors intact; new endpoint introduces no authorization or integrity regressions.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  }
+]

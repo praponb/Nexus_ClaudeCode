@@ -4,9 +4,13 @@ Drives the explicit state machine in ``state.py``. Frontend, Backend, and QA
 test-design run concurrently within each cycle (``asyncio.gather`` over
 independent agent invocations); QA execution runs afterward, once
 frontend/backend deliverables for that cycle exist. A QA test failure is
-recorded as data and never aborts the run -- only setup-level failures
-(path/ownership/allowlist/model-resolution errors, or any other unexpected
-exception) transition the run to FAILED.
+recorded as data and never aborts the run. An agent picking an unavailable
+command or malformed tool arguments is also non-fatal -- those tools return
+a structured ``{"error": ...}`` result the model can recover from, rather
+than raising (raising inside one of several concurrently-gathered agent
+invocations would cancel its unrelated siblings' legitimate work too). Only
+genuine setup-level failures (path/ownership violations, model-resolution
+errors, or any other unexpected exception) transition the run to FAILED.
 """
 
 from __future__ import annotations
@@ -17,6 +21,7 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
+from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.adk.runners import InMemoryRunner
 from google.genai import types
 
@@ -46,6 +51,15 @@ from agentic_builder.tools.markdown_discovery import InputManifest, load_and_val
 
 StateHandler = Callable[[], Awaitable[None]]
 
+#: RequirementRecord.status is a free-text field the Team Lead sets (see
+#: prompts/team_lead.md), not a closed enum -- match case-insensitively
+#: against every synonym actually observed in real runs (e.g. "verified"),
+#: not just "implemented"/"tested", so the final report's implemented/
+#: not-implemented split doesn't miscategorize genuinely completed work.
+_IMPLEMENTED_STATUSES = frozenset(
+    {"implemented", "tested", "verified", "done", "complete", "completed"}
+)
+
 
 class Orchestrator:
     """Owns run state, agent invocation, and consolidated reports for one run."""
@@ -62,14 +76,27 @@ class Orchestrator:
         self.run_id = run_id
         self.run_dir: Path = self.runs_root
         self.current_cycle = 0
+        self._current_state_name: str | None = None
         self.state_doc: RunStateDoc | None = None
         self._manifest: InputManifest | None = None
 
+        # Real models (esp. kimi-k3, which always runs in extended thinking
+        # mode) can take minutes to produce a large response. Non-streaming
+        # calls buffer the *entire* response before sending any bytes back,
+        # which is exactly the shape of request an idle-connection timeout
+        # somewhere in the network path (proxy, load balancer, etc.) will
+        # silently kill -- confirmed in practice against the live Moonshot
+        # API: a ~15KB non-streaming completion never returned, the
+        # identical request streamed completed in ~5 minutes with the first
+        # byte arriving in ~2s. SSE streaming avoids that failure mode.
+        self._run_config = RunConfig(streaming_mode=StreamingMode.SSE)
+
+        timeout = settings.agent_timeout_seconds
         self._agents = {
-            "team_lead": build_team_lead_agent(build_llm(settings, "team_lead")),
-            "frontend": build_frontend_agent(build_llm(settings, "frontend")),
-            "backend": build_backend_agent(build_llm(settings, "backend")),
-            "qa": build_qa_agent(build_llm(settings, "qa")),
+            "team_lead": build_team_lead_agent(build_llm(settings, "team_lead"), timeout=timeout),
+            "frontend": build_frontend_agent(build_llm(settings, "frontend"), timeout=timeout),
+            "backend": build_backend_agent(build_llm(settings, "backend"), timeout=timeout),
+            "qa": build_qa_agent(build_llm(settings, "qa"), timeout=timeout),
         }
         self._runners = {
             role: InMemoryRunner(agent=agent, app_name=self.APP_NAME)
@@ -138,9 +165,12 @@ class Orchestrator:
             self._log_and_record({"type": "run_complete", "run_id": self.run_id})
         except FatalOrchestrationError as exc:
             assert self.state_doc is not None
-            self.state_doc.mark_failed(
-                self.state_doc.current_state, mask_secrets(str(exc), self.settings)
-            )
+            # Use the state that was actually executing when it failed, not
+            # self.state_doc.current_state (which only reflects the last
+            # *successfully completed* state -- mark_done() is what updates
+            # it, and that never runs for the state that raised).
+            failed_state = self._current_state_name or self.state_doc.current_state
+            self.state_doc.mark_failed(failed_state, mask_secrets(str(exc), self.settings))
             save_state(self.run_dir, self.state_doc)
             self._log_and_record(
                 {"type": "run_failed", "error": mask_secrets(str(exc), self.settings)}
@@ -156,6 +186,7 @@ class Orchestrator:
         if self.state_doc.is_done(state_name):
             self._log_and_record({"type": "state_skipped_resume", "state": state_name})
             return
+        self._current_state_name = state_name
         self._log_and_record({"type": "state_entered", "state": state_name})
         try:
             await handler()
@@ -208,6 +239,7 @@ class Orchestrator:
             session_id=session_id,
             new_message=types.Content(role="user", parts=[types.Part(text=user_text)]),
             state_delta=state_delta,
+            run_config=self._run_config,
         ):
             if event.content and event.content.parts:
                 text_parts = [part.text for part in event.content.parts if part.text]
@@ -360,12 +392,14 @@ class Orchestrator:
                     commands.append(record)
 
         implemented = [
-            r for r in traceability.requirements.values() if r.status in {"implemented", "tested"}
+            r
+            for r in traceability.requirements.values()
+            if r.status.strip().lower() in _IMPLEMENTED_STATUSES
         ]
         not_implemented = [
             r
             for r in traceability.requirements.values()
-            if r.status not in {"implemented", "tested"}
+            if r.status.strip().lower() not in _IMPLEMENTED_STATUSES
         ]
 
         lines = [

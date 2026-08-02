@@ -19,10 +19,14 @@ Phase: design (runs in parallel with Frontend/Backend implementation)
 - Every test case must have at least: test_id, requirement_ids, title,
   objective, priority, type, preconditions, test_data, steps,
   expected_result, status (start as NOT_RUN), automation_status.
-- Call write_testcase_files exactly once with the test case files
-  (files_json: relative path under testcase/ -> full file content, e.g.
-  Markdown or JSON test case definitions) and a summary of what you
-  authored or updated this cycle.
+- Call write_testcase_files as many times as you need. Prefer incremental
+  progress: author the test plan and highest-priority test cases first,
+  then add more in follow-up calls -- do not try to produce every test
+  case for the whole app in a single call, since that can take a very long
+  time to generate and risks timing out with nothing saved. Include a
+  summary of what you authored or updated this cycle in your LAST
+  write_testcase_files call -- each call's summary overwrites the previous
+  one, so only the final one needs to be complete.
 
 Phase: execute (runs only after Frontend/Backend deliverables for this
 cycle are ready)

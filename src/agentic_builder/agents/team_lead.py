@@ -3,13 +3,15 @@ from __future__ import annotations
 from google.adk.agents import LlmAgent
 from google.adk.models import BaseLlm
 
-from agentic_builder.agents.base import build_llm_agent
+from agentic_builder.agents.base import DEFAULT_AGENT_TIMEOUT_SECONDS, build_llm_agent
 from agentic_builder.tools.file_io import read_workspace_file
 from agentic_builder.tools.markdown_discovery import discover_markdown_files, read_markdown_file
 from agentic_builder.tools.owned_writers import make_design_writer
 
 
-def build_team_lead_agent(model: BaseLlm) -> LlmAgent:
+def build_team_lead_agent(
+    model: BaseLlm, timeout: float = DEFAULT_AGENT_TIMEOUT_SECONDS
+) -> LlmAgent:
     return build_llm_agent(
         role="team_lead",
         model=model,
@@ -22,4 +24,5 @@ def build_team_lead_agent(model: BaseLlm) -> LlmAgent:
         output_key="team_lead_result",
         prompt_filename="team_lead.md",
         description="Owns detail-design-specification.md and cycle plans; reviews QA/impl output.",
+        timeout=timeout,
     )

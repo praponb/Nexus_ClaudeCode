@@ -79,5 +79,12 @@ def build_llm(settings: Settings, role: str) -> BaseLlm:
         kwargs["api_key"] = settings.MODEL_API_KEY.get_secret_value()
     if settings.MODEL_REASONING_EFFORT:
         kwargs["reasoning_effort"] = settings.MODEL_REASONING_EFFORT
+        # litellm's built-in "moonshot" provider config doesn't list
+        # reasoning_effort as supported and rejects it with
+        # UnsupportedParamsError by default, even though Moonshot's actual
+        # API accepts it (see ASSUMPTIONS.md / kimi-k3 quickstart). This
+        # tells litellm to forward it dynamically instead of dropping or
+        # rejecting it.
+        kwargs["allowed_openai_params"] = ["reasoning_effort"]
 
     return ResolvingLiteLlm(model=model_id, **kwargs)
