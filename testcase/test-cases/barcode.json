@@ -1,0 +1,83 @@
+[
+  {
+    "test_id": "TC-FR-017-01",
+    "requirement_ids": ["FR-017", "D-14"],
+    "title": "QR label generation — server-side SVG/PNG with deep link",
+    "objective": "Verify GET /assets/:uuid/label returns a QR code (SVG/PNG) encoding the asset tag and the /scan?tag= deep link, per D-14.",
+    "priority": "High",
+    "type": "API/Functional",
+    "preconditions": "operator session; asset exists.",
+    "test_data": "GET /api/v1/assets/<uuid>/label (default format + ?format=png if supported)",
+    "steps": [
+      "Request label; verify content type and non-empty body.",
+      "Decode QR payload (test-side decode or inspect generated content/embedded text).",
+      "Verify payload contains the asset tag and the /scan?tag=<tag> deep-link URL."
+    ],
+    "expected_result": "200 with image content; QR decodes to tag + correct deep link; label spec (50×25mm) noted for print CSS; endpoint permission-gated (401 anonymous, 404 out-of-scope).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (API/decode); print layout blocked without browser"
+  },
+  {
+    "test_id": "TC-FR-017-02",
+    "requirement_ids": ["FR-017"],
+    "title": "Batch label printing",
+    "objective": "Verify batch label generation for a filtered asset set produces labels for exactly the permitted, filtered assets.",
+    "priority": "Medium",
+    "type": "API/Functional",
+    "preconditions": "multiple in-scope assets + at least one out-of-scope asset.",
+    "test_data": "batch label request (endpoint per delivered contract; e.g., POST /assets/labels or query param set)",
+    "steps": ["Request batch labels for a filter set.", "Verify count and identity of included assets."],
+    "expected_result": "Batch contains exactly the requested in-scope assets; out-of-scope excluded; permission-gated. If batch printing is deferred to C3, record deferral and mark BLOCKED.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (if endpoint delivered)"
+  },
+  {
+    "test_id": "TC-FR-017-03",
+    "requirement_ids": ["FR-017"],
+    "title": "Scan lookup — known tag opens asset",
+    "objective": "Verify /scan?tag=<known tag> resolves to the correct asset detail (or lookup result) for authorized users.",
+    "priority": "High",
+    "type": "UI/Functional",
+    "preconditions": "browser + running stack (BLOCKED if unavailable); known tag.",
+    "test_data": "valid tag; tag of out-of-scope asset",
+    "steps": [
+      "Navigate to /scan?tag=<tag> as operator; verify asset detail/lookup opens with correct asset.",
+      "Repeat with out-of-scope asset tag; verify no existence leak."
+    ],
+    "expected_result": "Known in-scope tag lands on the asset; out-of-scope tag yields the same 'not found' UX as unknown tags; deep link requires auth first and returns to target after login.",
+    "status": "NOT_RUN",
+    "automation_status": "blocked without browser runner"
+  },
+  {
+    "test_id": "TC-FR-017-04",
+    "requirement_ids": ["FR-017"],
+    "title": "Unknown/invalid code — clear non-destructive result",
+    "objective": "Verify scanning/entering an unknown or malformed tag shows a clear 'not found' state and changes nothing.",
+    "priority": "High",
+    "type": "UI+API/Negative",
+    "preconditions": "scan page or lookup endpoint; operator session.",
+    "test_data": "tag 'NOPE-000000'; malformed input '<script>alert(1)</script>'; 500-char string",
+    "steps": [
+      "Submit unknown tag via manual entry (or lookup API).",
+      "Submit malformed/dangerous strings.",
+      "Verify response/UX and that no state changed (asset counts, audit)."
+    ],
+    "expected_result": "Clear non-destructive 'not found' result; dangerous input handled inertly (escaped/rejected, never executed); no 500s; nothing persisted.",
+    "status": "NOT_RUN",
+    "automation_status": "API portion automatable; UI portion blocked without browser"
+  },
+  {
+    "test_id": "TC-FR-017-05",
+    "requirement_ids": ["FR-017", "NFR-003"],
+    "title": "Manual tag entry always available and keyboard operable",
+    "objective": "Verify the scan page offers manual entry as a first-class fallback (no camera required), fully keyboard/screen-reader operable.",
+    "priority": "Medium",
+    "type": "UI/Accessibility",
+    "preconditions": "browser + running stack (BLOCKED if unavailable).",
+    "test_data": "known tag typed manually",
+    "steps": ["Open /scan without camera permission.", "Verify manual entry presented; complete a lookup keyboard-only."],
+    "expected_result": "Manual entry visible without camera; labeled input; result announced via live region; no camera dependency for core flow.",
+    "status": "NOT_RUN",
+    "automation_status": "blocked without browser runner"
+  }
+]

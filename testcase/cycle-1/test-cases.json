@@ -1,0 +1,1514 @@
+{
+  "cycle": 1,
+  "design_baseline": "detail-design-specification.md Rev 1.0",
+  "status_values": ["NOT_RUN", "PASSED", "FAILED", "BLOCKED", "MANUAL"],
+  "test_cases": [
+    {
+      "test_id": "TC-FR-001-01",
+      "requirement_ids": ["FR-001", "NFR-007"],
+      "title": "Valid login establishes session cookie",
+      "objective": "Verify POST /api/v1/auth/login with valid seeded credentials returns 200, sets a sessionid cookie with HttpOnly and SameSite=Lax (Secure outside local), and /auth/me then returns the user identity, role, and scopes.",
+      "priority": "P0",
+      "type": "API/functional",
+      "preconditions": "Compose stack up; migrations + seed applied; user 'operator' exists with documented dev password.",
+      "test_data": "operator / dev password from README (local seed)",
+      "steps": [
+        "GET /api/v1/auth/csrf to obtain csrftoken cookie",
+        "POST /api/v1/auth/login with X-CSRFToken header and JSON {username, password}",
+        "Inspect Set-Cookie attributes on sessionid",
+        "GET /api/v1/auth/me with session cookie"
+      ],
+      "expected_result": "200 on login; sessionid cookie HttpOnly, SameSite=Lax, Secure when not on localhost; /auth/me returns 200 with display name, role='operator', scopes, and capability flags; response JSON only (no stack traces).",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-001-02",
+      "requirement_ids": ["FR-001", "NFR-007"],
+      "title": "Invalid login gives generic failure without user enumeration",
+      "objective": "Verify wrong password and non-existent username produce identical generic error responses (same status, same message, similar timing class) and no indication which part failed.",
+      "priority": "P0",
+      "type": "API/security negative",
+      "preconditions": "Stack up; valid user 'operator' exists.",
+      "test_data": "(operator, wrong-password) and (no-such-user, any-password)",
+      "steps": [
+        "POST /auth/login with valid username + wrong password; record status/body",
+        "POST /auth/login with non-existent username; record status/body",
+        "Compare response bodies and codes"
+      ],
+      "expected_result": "Both return 401 with the error envelope, identical generic message, code AUTHENTICATION_REQUIRED or equivalent; no field_errors revealing username validity; no session cookie set.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-001-03",
+      "requirement_ids": ["FR-001"],
+      "title": "Logout invalidates session",
+      "objective": "Verify POST /auth/logout ends the session server-side; subsequent /auth/me with the old cookie returns 401.",
+      "priority": "P0",
+      "type": "API/functional",
+      "preconditions": "Logged-in session for 'operator'.",
+      "test_data": "operator session",
+      "steps": [
+        "Login; confirm /auth/me 200",
+        "POST /auth/logout with CSRF header",
+        "GET /auth/me again with same cookie jar"
+      ],
+      "expected_result": "Logout returns 200/204; /auth/me afterwards returns 401 with AUTHENTICATION_REQUIRED envelope.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-001-04",
+      "requirement_ids": ["FR-001", "FR-002"],
+      "title": "/auth/me exposes role, scopes, capability flags for permission-driven UI",
+      "objective": "Verify /auth/me payload contains role, organizational scopes, and capability flags sufficient for the frontend to hide unauthorized actions (design §14 rule 7).",
+      "priority": "P1",
+      "type": "API/contract",
+      "preconditions": "Seeded users for each role exist.",
+      "test_data": "admin, manager, deptmgr, operator, employee, auditor",
+      "steps": [
+        "Login as each seeded role user",
+        "GET /auth/me and compare role/scopes/capabilities across roles"
+      ],
+      "expected_result": "Each role returns distinct, correct capabilities (e.g. employee lacks asset:create; auditor lacks all mutations; admin unrestricted); scopes list present for scoped roles.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-001-05",
+      "requirement_ids": ["FR-001", "§11.2"],
+      "title": "Unauthenticated access to protected endpoints returns 401 envelope",
+      "objective": "Verify GET /api/v1/assets, /dashboard/summary, /saved-views without a session return 401 with the standard error envelope and no data.",
+      "priority": "P0",
+      "type": "API/security",
+      "preconditions": "Stack up; no session.",
+      "test_data": "none",
+      "steps": [
+        "GET each protected endpoint without cookies",
+        "Validate response body against error-envelope schema {error:{code,message,field_errors,correlation_id,retryable}}"
+      ],
+      "expected_result": "All return 401 with code AUTHENTICATION_REQUIRED, valid envelope, correlation_id present, no resource data leaked.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-001-06",
+      "requirement_ids": ["FR-001", "NFR-007"],
+      "title": "Session identifier rotates on login",
+      "objective": "Verify the session ID value changes at login (session fixation mitigation) while preserving the session.",
+      "priority": "P1",
+      "type": "API/security",
+      "preconditions": "Stack up.",
+      "test_data": "operator credentials",
+      "steps": [
+        "Obtain an anonymous/pre-login sessionid value (if any) or note cookie state",
+        "POST /auth/login",
+        "Compare sessionid value before/after login"
+      ],
+      "expected_result": "Session key rotates on successful login; old session key is invalid afterwards.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-001-07",
+      "requirement_ids": ["FR-001", "NFR-007"],
+      "title": "CSRF enforced on unsafe methods",
+      "objective": "Verify POST/PATCH/DELETE requests with a valid session but missing/invalid CSRF token are rejected.",
+      "priority": "P0",
+      "type": "API/security",
+      "preconditions": "Logged-in operator session.",
+      "test_data": "minimal asset create payload",
+      "steps": [
+        "POST /api/v1/assets with session cookie but no X-CSRFToken header",
+        "POST /auth/logout with no CSRF header",
+        "Repeat with an invalid token value"
+      ],
+      "expected_result": "Requests rejected (403 per Django CSRF behavior) with no state change; same requests with valid token succeed.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-001-08",
+      "requirement_ids": ["FR-001", "NFR-007"],
+      "title": "Login endpoint is rate limited",
+      "objective": "Verify repeated failed login attempts trigger rate limiting/backoff per design §13 (429 RATE_LIMITED or documented lockout).",
+      "priority": "P1",
+      "type": "API/security",
+      "preconditions": "Stack up; test uses a throwaway account to avoid locking seeded users.",
+      "test_data": "employee credentials with wrong password, N attempts (N per documented policy, default try 10-15)",
+      "steps": [
+        "POST /auth/login with bad credentials repeatedly until limit",
+        "Observe status codes and envelope"
+      ],
+      "expected_result": "After threshold, responses are 429 with code RATE_LIMITED and retryable indicator or documented lockout behavior; generic message retained (no enumeration).",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-001-09",
+      "requirement_ids": ["FR-001", "NFR-003"],
+      "title": "Expired/invalid session redirects to sign-in with return URL (UI)",
+      "objective": "Verify the SPA redirects to /login?next=... on 401 and, after re-auth, lands on the originally requested deep link (design §12 session-expiry UX).",
+      "priority": "P1",
+      "type": "E2E/functional",
+      "preconditions": "App running; a known asset detail URL exists.",
+      "test_data": "deep link /assets/<uuid>",
+      "steps": [
+        "Without a session, navigate to /assets/<uuid>",
+        "Observe redirect to /login with next param",
+        "Sign in as operator",
+        "Verify landing on the original asset detail page"
+      ],
+      "expected_result": "Redirect occurs with encoded next URL; post-login navigation lands on the deep link; no private data rendered before auth.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_E2E"
+    },
+    {
+      "test_id": "TC-FR-001-10",
+      "requirement_ids": ["FR-001", "FR-025"],
+      "title": "Login success/failure/logout produce audit events",
+      "objective": "Verify successful login, failed login, and logout each create AuditEvent rows with actor (or attempted identifier), action, timestamp UTC, outcome, and correlation ID.",
+      "priority": "P0",
+      "type": "API/audit",
+      "preconditions": "Admin access to audit query or DB inspection available in test env.",
+      "test_data": "operator credentials; one bad-password attempt",
+      "steps": [
+        "Perform failed login, successful login, logout",
+        "Query AuditEvent records (admin API or DB) for the three actions"
+      ],
+      "expected_result": "Three audit rows exist with correct action types, outcomes (failure/success), UTC timestamps, and correlation IDs; failed attempt does not record the password.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-001-11",
+      "requirement_ids": ["FR-001", "D-01", "D-13"],
+      "title": "Local auth cannot be enabled in production settings",
+      "objective": "Verify that with APP_ENV=production and LOCAL_AUTH_ENABLED unset, the app fails fast or hard-disables local login; with explicit LOCAL_AUTH_ENABLED=true a loud warning/override path per design is required.",
+      "priority": "P1",
+      "type": "Config/security",
+      "preconditions": "Ability to run Django check/startup with production settings in test harness.",
+      "test_data": "env variations: APP_ENV=production with/without LOCAL_AUTH_ENABLED",
+      "steps": [
+        "Run backend startup/check with production settings and no LOCAL_AUTH_ENABLED",
+        "Repeat with LOCAL_AUTH_ENABLED=true and observe logged warning/behavior"
+      ],
+      "expected_result": "Startup refuses or disables local auth in production by default; override requires explicit env and logs a prominent warning.",
+      "status": "NOT_RUN",
+      "automation_status": "SEMI_AUTOMATED"
+    },
+
+    {
+      "test_id": "TC-FR-002-01",
+      "requirement_ids": ["FR-002", "FR-026"],
+      "title": "Non-admin roles cannot write reference data",
+      "objective": "Verify POST/PATCH on /api/v1/reference-data/* by operator/employee/auditor is denied, while admin succeeds.",
+      "priority": "P0",
+      "type": "API/authorization",
+      "preconditions": "Seeded users per role; valid CSRF.",
+      "test_data": "new category payload {name:'QA Cat', code:'QACAT'}",
+      "steps": [
+        "As operator: POST /reference-data/categories",
+        "As employee and auditor: repeat",
+        "As admin: repeat and then clean up"
+      ],
+      "expected_result": "Operator/employee/auditor receive 403 PERMISSION_DENIED envelope; admin receives 201; denials leak no data.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-002-02",
+      "requirement_ids": ["FR-002", "NFR-008"],
+      "title": "Asset list is filtered by organizational scope",
+      "objective": "Verify a department-scoped user (deptmgr/employee) sees only assets within their scopes in GET /assets, while admin/asset_manager see all permitted records.",
+      "priority": "P0",
+      "type": "API/authorization",
+      "preconditions": "Seed includes assets across multiple departments/locations; deptmgr scoped to one department.",
+      "test_data": "seeded assets (~200) across ~8 departments",
+      "steps": [
+        "As admin: GET /assets, record count",
+        "As deptmgr: GET /assets, record count and department values of results",
+        "Cross-check that no out-of-scope asset appears for deptmgr"
+      ],
+      "expected_result": "deptmgr count < admin count; every returned asset is within deptmgr scope; envelope pagination correct on both.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-002-03",
+      "requirement_ids": ["FR-002", "NFR-007"],
+      "title": "Direct detail access to out-of-scope asset returns 404 (no existence leak)",
+      "objective": "Verify a scoped user requesting GET /assets/{uuid} for an out-of-scope asset receives 404 (not 403), avoiding existence disclosure per design §11.2.",
+      "priority": "P0",
+      "type": "API/authorization",
+      "preconditions": "Known UUID of an asset outside deptmgr's scope.",
+      "test_data": "out-of-scope asset UUID from admin listing",
+      "steps": [
+        "As admin, identify an asset outside deptmgr scope",
+        "As deptmgr, GET /assets/{that uuid}",
+        "Also GET a random non-existent UUID and compare responses"
+      ],
+      "expected_result": "Both requests return indistinguishable 404 NOT_FOUND envelopes; no difference in body that reveals existence.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-002-04",
+      "requirement_ids": ["FR-002", "NFR-008", "D-06"],
+      "title": "Financial fields hidden from roles without finance.view",
+      "objective": "Verify purchase_price/purchase_currency and other financial fields are absent from asset serializers for roles lacking finance.view, and present (as money object) for authorized roles.",
+      "priority": "P1",
+      "type": "API/authorization/privacy",
+      "preconditions": "Seeded asset with purchase price exists.",
+      "test_data": "asset with purchase_price set",
+      "steps": [
+        "As employee: GET /assets/{uuid} and list response fields",
+        "As admin/asset_manager (whichever holds finance.view): same request",
+        "Verify money object shape {amount, currency} where present"
+      ],
+      "expected_result": "Financial fields absent (not null-masked) for unauthorized roles; authorized roles receive {\"amount\": \"1234.56\", \"currency\": \"USD\"} decimal-string format; never a float.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-002-05",
+      "requirement_ids": ["FR-002", "FR-003"],
+      "title": "Employee cannot create assets (vertical privilege check)",
+      "objective": "Verify POST /assets as employee returns 403 and creates nothing.",
+      "priority": "P0",
+      "type": "API/authorization",
+      "preconditions": "Employee session; valid CSRF.",
+      "test_data": "valid asset payload",
+      "steps": [
+        "As employee, POST /api/v1/assets with a fully valid payload",
+        "Verify response and that asset count is unchanged"
+      ],
+      "expected_result": "403 PERMISSION_DENIED envelope; no Asset, LifecycleEvent, or AuditEvent-created record for the attempted asset.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-002-06",
+      "requirement_ids": ["FR-002"],
+      "title": "Auditor role is read-only across all endpoints",
+      "objective": "Verify auditor can GET permitted resources but every mutation (POST/PATCH/DELETE) is denied.",
+      "priority": "P1",
+      "type": "API/authorization",
+      "preconditions": "Auditor session.",
+      "test_data": "asset PATCH payload; saved-view POST payload",
+      "steps": [
+        "As auditor: GET /assets (expect 200)",
+        "PATCH /assets/{uuid}; POST /saved-views; POST /assets — expect denials"
+      ],
+      "expected_result": "Reads succeed within scope; all mutations return 403 PERMISSION_DENIED; no state changes.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-002-07",
+      "requirement_ids": ["FR-002", "NFR-007"],
+      "title": "Horizontal escalation: user cannot act on another user's saved views",
+      "objective": "Verify PATCH/DELETE on a saved view owned by a different user is denied/404 even for same-role users.",
+      "priority": "P1",
+      "type": "API/authorization",
+      "preconditions": "Two operator-level users (or operator + manager) each with an own saved view.",
+      "test_data": "saved view UUID owned by manager",
+      "steps": [
+        "As operator, PATCH and DELETE manager's saved view UUID",
+        "Verify manager's view is unchanged"
+      ],
+      "expected_result": "Requests denied (403 or 404); target view unchanged; denial audited if policy requires.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-002-08",
+      "requirement_ids": ["FR-002", "NFR-003", "LAY"],
+      "title": "UI hides unauthorized actions and gates not-yet-delivered modules",
+      "objective": "Verify the frontend hides create/edit/admin actions for roles lacking capabilities, and Cycle 2/3 modules (Scan/Tasks/Imports etc.) are either absent, marked 'coming soon', or permission-gated; backend remains the enforcement boundary.",
+      "priority": "P1",
+      "type": "E2E/UI authorization",
+      "preconditions": "App running; sessions for employee and operator.",
+      "test_data": "employee and operator logins",
+      "steps": [
+        "As employee: verify no 'New asset' affordance, no edit buttons on detail",
+        "Attempt direct navigation to /assets/new as employee",
+        "Check Scan/Tasks bottom-nav entries show accessible 'coming soon' empty states or are hidden"
+      ],
+      "expected_result": "Unauthorized UI actions hidden; direct URL access to /assets/new as employee results in 403 page or redirect; stubs are accessible-but-inert with proper labeling; server still rejects forged API calls (covered by TC-FR-002-05).",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_E2E"
+    },
+
+    {
+      "test_id": "TC-FR-003-01",
+      "requirement_ids": ["FR-003", "FR-025"],
+      "title": "Create asset with valid required fields succeeds atomically",
+      "objective": "Verify POST /assets with all category-driven required fields returns 201, the asset is retrievable, and Asset + initial LifecycleEvent + AuditEvent are created atomically.",
+      "priority": "P0",
+      "type": "API/functional",
+      "preconditions": "Operator session; category with attribute definitions seeded; valid CSRF.",
+      "test_data": "{tag, name, category, status, condition, department, location, serial_number}",
+      "steps": [
+        "POST /api/v1/assets with valid payload",
+        "GET the returned asset by UUID",
+        "Verify one initial LifecycleEvent and one AuditEvent exist for the asset"
+      ],
+      "expected_result": "201 with asset representation (UUID, version=1); detail GET 200; exactly one 'created/registered' lifecycle event and one audit event with before=null/after snapshot, actor=operator, correlation ID echoed.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-003-02",
+      "requirement_ids": ["FR-003", "§11.2"],
+      "title": "Missing/invalid required fields return 400 with per-field errors",
+      "objective": "Verify validation failures return the error envelope with field_errors keyed per field and user-safe messages.",
+      "priority": "P0",
+      "type": "API/validation negative",
+      "preconditions": "Operator session.",
+      "test_data": "payload missing name/category; invalid date format; invalid reference UUIDs",
+      "steps": [
+        "POST /assets with {} empty body",
+        "POST with invalid category UUID and malformed purchase_date",
+        "Inspect field_errors keys"
+      ],
+      "expected_result": "400 VALIDATION_FAILED; field_errors lists each offending field with a message; nothing persisted; envelope has correlation_id and retryable=false.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-003-03",
+      "requirement_ids": ["FR-003", "BR-001"],
+      "title": "Duplicate asset tag rejected",
+      "objective": "Verify creating an asset with an existing tag fails with DUPLICATE_TAG (400 or 409 per API mapping) and tag uniqueness holds for all time including archived records.",
+      "priority": "P0",
+      "type": "API/integrity",
+      "preconditions": "Existing asset with tag T.",
+      "test_data": "payload reusing tag T",
+      "steps": [
+        "POST /assets with tag T",
+        "Confirm DB-level uniqueness by attempting direct second create via API again"
+      ],
+      "expected_result": "Request rejected with code DUPLICATE_TAG; no second asset created; error message is user-safe.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-003-04",
+      "requirement_ids": ["FR-003"],
+      "title": "Duplicate pre-check returns non-blocking warnings",
+      "objective": "Verify POST /assets/{id}/check-duplicates (or pre-check endpoint) flags possible duplicates by serial number and manufacturer+model as warnings without blocking save.",
+      "priority": "P1",
+      "type": "API/functional",
+      "preconditions": "Existing asset with serial S, manufacturer M, model Mo.",
+      "test_data": "candidate payload reusing serial S; another reusing M+Mo",
+      "steps": [
+        "Call check-duplicates with serial S",
+        "Call with same manufacturer+model, different serial",
+        "Proceed to save despite warnings"
+      ],
+      "expected_result": "Responses include structured warnings listing matched assets/fields; HTTP 200 (non-blocking); save with warnings succeeds (unless category enforces serial uniqueness — then documented 400/409).",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-003-05",
+      "requirement_ids": ["FR-003", "BR-001"],
+      "title": "Server-generated tags are unique under concurrent creation",
+      "objective": "Verify the AssetTagSequence-based tag generation produces unique tags when multiple creates occur concurrently (locked increments).",
+      "priority": "P1",
+      "type": "API/concurrency",
+      "preconditions": "Server-side tag generation enabled; operator session.",
+      "test_data": "10 concurrent create requests without client-supplied tags",
+      "steps": [
+        "Fire 10 parallel POST /assets requests (pytest threads or async client)",
+        "Collect returned tags"
+      ],
+      "expected_result": "All 10 succeed with distinct, sequence-conformant tags; no DUPLICATE_TAG errors; no gaps indicating lost updates.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-003-06",
+      "requirement_ids": ["FR-003"],
+      "title": "Draft save permitted with incomplete optional data",
+      "objective": "Verify an asset can be saved in Draft status with minimal identity fields, per FR-003 draft-save allowance.",
+      "priority": "P2",
+      "type": "API/functional",
+      "preconditions": "Draft status exists in seeded statuses.",
+      "test_data": "{tag, name, category, status=DRAFT}",
+      "steps": [
+        "POST /assets with draft payload omitting optional fields",
+        "GET asset and confirm status"
+      ],
+      "expected_result": "201; asset persisted with Draft status; required-field rules for Draft are the documented minimal set.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-003-07",
+      "requirement_ids": ["FR-003", "D-08"],
+      "title": "Idempotency-Key prevents duplicate creates on retry",
+      "objective": "Verify repeating POST /assets with the same Idempotency-Key returns the original response without creating a second asset (24h TTL, scoped per user+endpoint).",
+      "priority": "P1",
+      "type": "API/idempotency",
+      "preconditions": "Operator session.",
+      "test_data": "valid payload + Idempotency-Key: <uuid>",
+      "steps": [
+        "POST /assets with key K; record response and asset UUID",
+        "Repeat identical request with key K",
+        "Repeat with same key but different payload (expect conflict or documented behavior)",
+        "Count assets created"
+      ],
+      "expected_result": "Exactly one asset created; second identical request returns the stored response (same UUID); same key + different payload rejected per documented behavior.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-003-08",
+      "requirement_ids": ["FR-003", "FR-026"],
+      "title": "Category attribute values validated against definitions",
+      "objective": "Verify category_attributes JSON is validated against CategoryAttributeDefinition (type, required, choice options) and invalid values are rejected with field errors.",
+      "priority": "P1",
+      "type": "API/validation",
+      "preconditions": "Seeded category with attribute definitions incl. a required choice attribute.",
+      "test_data": "attributes with wrong type (string for number), missing required key, invalid choice",
+      "steps": [
+        "POST /assets with each invalid attribute variant",
+        "POST with fully valid attributes"
+      ],
+      "expected_result": "Invalid variants → 400 with attribute-specific field_errors; valid variant → 201 and attributes round-trip on GET.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-003-09",
+      "requirement_ids": ["FR-003", "NFR-007"],
+      "title": "XSS payloads in text fields are stored inertly and escaped in UI",
+      "objective": "Verify script/HTML payloads in name/description are accepted as data (or rejected per policy) but never executed: API returns them as plain text and the UI renders escaped content.",
+      "priority": "P1",
+      "type": "Security (API+E2E)",
+      "preconditions": "Operator session; browser for UI verification.",
+      "test_data": "name: <script>alert(1)</script>; description: <img src=x onerror=alert(1)>",
+      "steps": [
+        "Create asset with XSS payloads",
+        "Open asset list and detail in browser; confirm no script execution (no alert, no injected nodes)",
+        "Verify API returns raw string (not sanitized into corruption) and CSP header present"
+      ],
+      "expected_result": "No script execution anywhere; values display as literal text; CSP header present on frontend responses.",
+      "status": "NOT_RUN",
+      "automation_status": "SEMI_AUTOMATED"
+    },
+
+    {
+      "test_id": "TC-FR-004-01",
+      "requirement_ids": ["FR-004"],
+      "title": "Asset detail returns complete identity representation",
+      "objective": "Verify GET /assets/{uuid} returns identity fields (tag, name, category, status, condition, department, location, custodian, serial, manufacturer/model, version, timestamps) per data model.",
+      "priority": "P0",
+      "type": "API/functional",
+      "preconditions": "Seeded asset exists; authorized session.",
+      "test_data": "seeded asset UUID",
+      "steps": [
+        "GET /assets/{uuid} as operator",
+        "Validate fields against OpenAPI schema"
+      ],
+      "expected_result": "200 with all identity fields; UUID (not bigint) exposed; version integer present; datetimes ISO 8601 with TZ.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-004-02",
+      "requirement_ids": ["FR-004", "D-07"],
+      "title": "Edit asset succeeds and increments version",
+      "objective": "Verify PATCH /assets/{uuid} with correct version (body or If-Match) applies changes, increments version, and updates updated_at.",
+      "priority": "P0",
+      "type": "API/functional",
+      "preconditions": "Operator session; asset at version v.",
+      "test_data": "PATCH {name: 'Updated name', version: v}",
+      "steps": [
+        "GET asset, note version v and updated_at",
+        "PATCH with version v",
+        "GET again"
+      ],
+      "expected_result": "200; name updated; version = v+1; updated_at advanced; response carries new version for subsequent edits.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-004-03",
+      "requirement_ids": ["FR-004", "BR-009", "D-07"],
+      "title": "Stale version update rejected with 409 VERSION_CONFLICT",
+      "objective": "Verify a PATCH carrying an outdated version fails with 409 VERSION_CONFLICT and no partial update occurs; UI surfaces a conflict prompt.",
+      "priority": "P0",
+      "type": "API/concurrency + E2E",
+      "preconditions": "Asset at version v; two sessions (or sequential requests).",
+      "test_data": "two PATCHes both with version v",
+      "steps": [
+        "PATCH #1 with version v (succeeds, now v+1)",
+        "PATCH #2 with stale version v",
+        "Verify only PATCH #1's changes persisted",
+        "E2E: open edit form in two tabs, save both, verify second shows conflict message with reload path"
+      ],
+      "expected_result": "Second PATCH → 409 VERSION_CONFLICT envelope; stored data equals PATCH #1 only; UI displays a clear conflict state (no silent overwrite).",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-004-04",
+      "requirement_ids": ["FR-004", "FR-029"],
+      "title": "Asset history endpoint returns chronological lifecycle events",
+      "objective": "Verify GET /assets/{uuid}/history returns the asset's lifecycle events in reverse-chronological order with actor, timestamp, type, and summary.",
+      "priority": "P1",
+      "type": "API/functional",
+      "preconditions": "Asset with create + at least one update event.",
+      "test_data": "asset from TC-FR-003-01 updated once",
+      "steps": [
+        "GET /assets/{uuid}/history",
+        "Verify ordering, event fields, and pagination if applicable"
+      ],
+      "expected_result": "Events ordered newest-first; each has type, actor, occurred_at (UTC, TZ-aware), summary; cycle-1 scope covers lifecycle+audit-level events.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-004-05",
+      "requirement_ids": ["FR-004", "FR-025"],
+      "title": "Material updates audited with before/after snapshots",
+      "objective": "Verify each asset update writes an AuditEvent containing before and after JSON for changed fields, actor, UTC timestamp, and correlation ID.",
+      "priority": "P0",
+      "type": "API/audit",
+      "preconditions": "Asset updated via PATCH; audit readable in test env.",
+      "test_data": "PATCH changing name and condition",
+      "steps": [
+        "PATCH asset fields",
+        "Inspect the resulting AuditEvent row"
+      ],
+      "expected_result": "AuditEvent exists with action=update, before/after containing the changed fields' old/new values, actor identity, correlation_id matching the API request, outcome=success.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-004-06",
+      "requirement_ids": ["FR-004", "§11.2"],
+      "title": "Invalid or non-existent asset UUID returns 404 envelope",
+      "objective": "Verify GET/PATCH on a random UUID or malformed identifier returns a clean 404 (or 400 for malformed) envelope, never a 500 or stack trace.",
+      "priority": "P1",
+      "type": "API/error handling",
+      "preconditions": "Authorized session.",
+      "test_data": "random UUID; malformed id 'not-a-uuid'",
+      "steps": [
+        "GET /assets/<random-uuid>",
+        "GET /assets/not-a-uuid"
+      ],
+      "expected_result": "404 NOT_FOUND for valid-but-missing UUID; 400 or 404 for malformed id per documented behavior; both use the error envelope; no internals leaked.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-004-07",
+      "requirement_ids": ["FR-004", "NFR-001", "§8.5"],
+      "title": "Edit form: unsaved-changes guard and error-summary focus management",
+      "objective": "Verify navigating away from a dirty edit form prompts a confirmation; failed submit moves focus to an error summary with per-field errors and preserves entered values.",
+      "priority": "P1",
+      "type": "E2E/usability",
+      "preconditions": "Edit page for a seeded asset.",
+      "test_data": "modify name; submit a form with a deliberately invalid field",
+      "steps": [
+        "Change a field, attempt browser/router navigation away — expect guard prompt",
+        "Submit form with an invalid value — expect error summary receives focus, fields keep values, per-field errors associated with inputs"
+      ],
+      "expected_result": "Guard prompt appears and blocks navigation until confirmed; error summary focused on failed submit; aria-describedby links errors to fields; no data loss.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_E2E"
+    },
+
+    {
+      "test_id": "TC-FR-005-01",
+      "requirement_ids": ["FR-005"],
+      "title": "Global search ranks exact tag match first",
+      "objective": "Verify GET /search/assets?q=<exact tag> returns the exact-tag asset as the first result, ahead of partial matches.",
+      "priority": "P0",
+      "type": "API/functional",
+      "preconditions": "Seeded assets with known tags incl. one whose tag is a substring of another's name.",
+      "test_data": "exact tag of seeded asset",
+      "steps": [
+        "GET /search/assets?q=<tag>",
+        "Inspect ordering and match metadata"
+      ],
+      "expected_result": "Exact tag match is result #1; results scoped to caller's permissions; response time reasonable (<2s p95 target, smoke-level check).",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-005-02",
+      "requirement_ids": ["FR-005"],
+      "title": "Search matches serial, name, model, custodian, location",
+      "objective": "Verify search finds assets by serial number, name substring, model, custodian name, and location name per FR-005.",
+      "priority": "P1",
+      "type": "API/functional",
+      "preconditions": "Seeded assets with distinct values in each searchable field.",
+      "test_data": "known serial, name fragment, model, custodian, location",
+      "steps": [
+        "Run one search per field type",
+        "Verify expected asset appears in results"
+      ],
+      "expected_result": "Each field type yields its matching asset; no crashes on special characters (%, _, quotes) in q.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-005-03",
+      "requirement_ids": ["FR-005"],
+      "title": "List filters by status, category, department, location, condition",
+      "objective": "Verify GET /assets supports the documented filter parameters and combinations, returning only matching in-scope assets.",
+      "priority": "P0",
+      "type": "API/functional",
+      "preconditions": "Seeded variety of statuses/categories/departments.",
+      "test_data": "?status=<code>, ?category=<uuid>, ?department=<uuid>, combined filters",
+      "steps": [
+        "Apply each filter singly and verify every result matches",
+        "Apply combined filters and verify intersection semantics",
+        "Apply invalid filter value — expect 400 or empty result per contract"
+      ],
+      "expected_result": "All returned rows satisfy all active filters; invalid filter values handled per documented contract (no 500).",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-005-04",
+      "requirement_ids": ["FR-005"],
+      "title": "Server-side sorting on supported columns",
+      "objective": "Verify ?ordering= and ?ordering=- on documented sortable fields (name, tag, updated_at, status) return correctly ordered results.",
+      "priority": "P1",
+      "type": "API/functional",
+      "preconditions": "Seeded assets.",
+      "test_data": "ordering=name, ordering=-updated_at, ordering=bogus_field",
+      "steps": [
+        "Request each ordering and verify result sequence",
+        "Request an unsupported ordering field"
+      ],
+      "expected_result": "Ascending/descending orders correct; unsupported field rejected (400) or ignored per documented contract — never 500.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-005-05",
+      "requirement_ids": ["FR-005", "D-09"],
+      "title": "Pagination envelope and page_size limits enforced",
+      "objective": "Verify list responses use {count, next, previous, results}; default page_size=25; page_size>100 clamped or rejected; page navigation consistent.",
+      "priority": "P0",
+      "type": "API/contract",
+      "preconditions": "≥50 seeded assets visible to admin.",
+      "test_data": "?page=2, ?page_size=10, ?page_size=500, ?page=9999",
+      "steps": [
+        "GET /assets default — verify envelope and 25 items",
+        "GET with page_size=10 and page=2 — verify correct slice and next/previous links",
+        "GET page_size=500 — verify max-100 handling",
+        "GET out-of-range page — verify documented behavior (404 or empty)"
+      ],
+      "expected_result": "Envelope always present; defaults and max enforced per D-09; no duplicate/skipped rows across consecutive pages.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-005-06",
+      "requirement_ids": ["FR-005", "NFR-001"],
+      "title": "Filter/sort/pagination state synchronized to URL query params",
+      "objective": "Verify the asset register reflects filters, sort, and page in the URL; reloading or sharing the URL restores the identical view (bookmarkable).",
+      "priority": "P1",
+      "type": "E2E/functional",
+      "preconditions": "App running; operator login.",
+      "test_data": "apply status filter + sort by name + page 2",
+      "steps": [
+        "Apply filters/sort/page in UI; observe URL",
+        "Copy URL, open in fresh browser context, sign in, verify identical view",
+        "Use browser back/forward and verify state restoration"
+      ],
+      "expected_result": "URL contains all state; fresh load reproduces identical results and active-filter chips; history navigation works.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_E2E"
+    },
+    {
+      "test_id": "TC-FR-005-07",
+      "requirement_ids": ["FR-005", "FR-002"],
+      "title": "Search results respect organizational scope",
+      "objective": "Verify search never returns out-of-scope assets to scoped users even when the query exactly matches an out-of-scope tag.",
+      "priority": "P0",
+      "type": "API/security",
+      "preconditions": "Out-of-scope asset with known tag (relative to deptmgr).",
+      "test_data": "q=<out-of-scope tag>",
+      "steps": [
+        "As deptmgr, search for the out-of-scope tag",
+        "Verify result set"
+      ],
+      "expected_result": "Out-of-scope asset absent from results; response indistinguishable from 'no matches'.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-005-08",
+      "requirement_ids": ["FR-005", "NFR-001"],
+      "title": "Empty search/filter results show a proper empty state",
+      "objective": "Verify a query/filter combination with no matches renders an accessible empty state with guidance (not a blank table or error).",
+      "priority": "P2",
+      "type": "E2E/usability",
+      "preconditions": "App running.",
+      "test_data": "q=zzz-no-such-asset-zzz",
+      "steps": [
+        "Search for a nonsense string; apply impossible filter combo",
+        "Inspect empty-state region"
+      ],
+      "expected_result": "Empty state displayed with clear text and a reset/clear-filters action; announced via live region or reachable by screen reader; table headers/structure remain coherent.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_E2E"
+    },
+
+    {
+      "test_id": "TC-FR-006-01",
+      "requirement_ids": ["FR-006"],
+      "title": "Create, apply, and delete own saved view",
+      "objective": "Verify POST /saved-views stores a filter configuration, GET lists own views, applying it reproduces the filter state, and DELETE removes it.",
+      "priority": "P1",
+      "type": "API + E2E/functional",
+      "preconditions": "Operator session.",
+      "test_data": "view {name:'QA laptops', config:{status:'IN_USE', category:'Laptop'}}",
+      "steps": [
+        "POST /saved-views; GET /saved-views and confirm presence",
+        "In UI, apply the view and verify filters/URL update accordingly",
+        "DELETE the view; confirm 404 afterwards"
+      ],
+      "expected_result": "Full CRUD round-trip works for own views; applying the view restores exact filter state; deleted view gone from list and direct GET.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-006-02",
+      "requirement_ids": ["FR-006", "FR-002"],
+      "title": "Other users' private saved views are invisible and immutable",
+      "objective": "Verify private saved views of another user do not appear in listings and cannot be read/modified/deleted directly.",
+      "priority": "P1",
+      "type": "API/authorization",
+      "preconditions": "View owned by manager; operator session.",
+      "test_data": "manager's view UUID",
+      "steps": [
+        "As operator: GET /saved-views (verify absence), GET/PATCH/DELETE the UUID directly"
+      ],
+      "expected_result": "View absent from operator's list; direct access returns 404 (or 403 per contract) with no state change.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-006-03",
+      "requirement_ids": ["FR-006"],
+      "title": "Default view selection persists per user",
+      "objective": "Verify marking a saved view as default makes the asset register load with that view applied for that user only.",
+      "priority": "P2",
+      "type": "E2E/functional",
+      "preconditions": "Operator owns ≥2 views.",
+      "test_data": "set view A as default",
+      "steps": [
+        "Mark view A default via API/UI",
+        "Reload /assets and verify view A applied",
+        "Log in as different user and verify their register is unaffected"
+      ],
+      "expected_result": "Default applied on register load for the owning user only; setting a new default unsets the previous one.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_E2E"
+    },
+
+    {
+      "test_id": "TC-FR-020-01",
+      "requirement_ids": ["FR-020", "FR-002"],
+      "title": "Dashboard summary returns scope-correct counts",
+      "objective": "Verify GET /dashboard/summary returns basic KPI counts (totals, by status/category as delivered) computed only over the caller's permitted record set.",
+      "priority": "P0",
+      "type": "API/functional",
+      "preconditions": "Seeded assets across departments/statuses.",
+      "test_data": "admin vs deptmgr sessions",
+      "steps": [
+        "GET /dashboard/summary as admin and as deptmgr",
+        "Independently compute deptmgr-visible counts via filtered /assets queries",
+        "Compare totals"
+      ],
+      "expected_result": "deptmgr totals equal the independently computed in-scope counts; admin sees org-wide totals; no cross-scope leakage; response shape per OpenAPI.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-020-02",
+      "requirement_ids": ["FR-020", "NFR-001"],
+      "title": "Dashboard KPI cards render loading, empty, and error states",
+      "objective": "Verify the dashboard shows skeletons while loading, a coherent empty state when counts are zero, and an error state with correlation ID on API failure.",
+      "priority": "P1",
+      "type": "E2E/usability",
+      "preconditions": "App running; ability to simulate failure (e.g. stop backend or use a route mock in Playwright).",
+      "test_data": "normal load; forced 500 from /dashboard/summary (route interception)",
+      "steps": [
+        "Load dashboard; observe skeleton then KPI cards",
+        "Intercept /dashboard/summary to return 500 envelope; reload",
+        "Verify error UI shows user-safe message + correlation ID, with retry"
+      ],
+      "expected_result": "All three states implemented accessibly; no raw exception text; retry re-fetches.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_E2E"
+    },
+    {
+      "test_id": "TC-FR-020-03",
+      "requirement_ids": ["FR-020", "NFR-008"],
+      "title": "KPI indicators link to correctly filtered lists",
+      "objective": "Verify clicking a KPI (e.g. by-status count) navigates to /assets with the corresponding filter applied and the list count reconciles with the KPI.",
+      "priority": "P2",
+      "type": "E2E/functional",
+      "preconditions": "Dashboard with at least one drill-through KPI as delivered in Cycle 1.",
+      "test_data": "status KPI",
+      "steps": [
+        "Click a KPI card link",
+        "Verify destination URL filters and that list count equals the KPI number"
+      ],
+      "expected_result": "Navigation applies matching filters; KPI and list totals reconcile for the user's scope.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_E2E"
+    },
+
+    {
+      "test_id": "TC-FR-025-01",
+      "requirement_ids": ["FR-025", "NFR-009"],
+      "title": "Asset mutations create AuditEvents with correlation IDs",
+      "objective": "Verify create/update operations write AuditEvent rows whose correlation_id matches the request's X-Correlation-ID and whose actor/action/target/timestamp fields are complete.",
+      "priority": "P0",
+      "type": "API/audit",
+      "preconditions": "Audit readable in test env (admin API or DB).",
+      "test_data": "create + update with client-supplied X-Correlation-ID",
+      "steps": [
+        "Send create and update requests with known correlation IDs",
+        "Fetch corresponding AuditEvents and compare"
+      ],
+      "expected_result": "Audit rows found by correlation ID; actor=user identity, target=asset UUID, action correct, created_at UTC, outcome recorded.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-025-02",
+      "requirement_ids": ["FR-025"],
+      "title": "Audit hash chain is intact and tamper-evident",
+      "objective": "Verify AuditEvent rows chain via prev_hash/record_hash (SHA-256) and that recomputation over a sequence validates; tampering (simulated in a throwaway test DB) breaks verification.",
+      "priority": "P1",
+      "type": "Backend/integrity",
+      "preconditions": "Several audit events exist; test harness can recompute hashes.",
+      "test_data": "existing audit rows",
+      "steps": [
+        "Recompute record_hash for a sequence of events using documented canonicalization",
+        "Verify each prev_hash equals prior record_hash",
+        "In a disposable test DB, modify one row's payload and re-run verification"
+      ],
+      "expected_result": "Chain verifies on unmodified data; verification fails after tampering.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_UNIT"
+    },
+    {
+      "test_id": "TC-FR-025-03",
+      "requirement_ids": ["FR-025"],
+      "title": "Audit events are append-only via application surface",
+      "objective": "Verify no API endpoint permits updating or deleting audit events, and app DB role lacks UPDATE/DELETE on the audit table where enforced.",
+      "priority": "P1",
+      "type": "API/security",
+      "preconditions": "Admin session; known AuditEvent identifier.",
+      "test_data": "attempt PATCH/DELETE on audit resource paths",
+      "steps": [
+        "Attempt PATCH/DELETE against any audit endpoint (expect method not allowed / 404 / 405)",
+        "Where DB permissions are enforced, attempt direct UPDATE as app role in test DB"
+      ],
+      "expected_result": "No application path mutates audit history; attempts are denied and, where policy requires, logged.",
+      "status": "NOT_RUN",
+      "automation_status": "SEMI_AUTOMATED"
+    },
+
+    {
+      "test_id": "TC-FR-026-01",
+      "requirement_ids": ["FR-026"],
+      "title": "Reference data readable by authenticated users",
+      "objective": "Verify GET endpoints for categories, statuses, conditions, departments, locations, cost-centers, suppliers return seeded data to any authenticated role and 401 to anonymous callers.",
+      "priority": "P1",
+      "type": "API/functional",
+      "preconditions": "Seed applied per §10.4.",
+      "test_data": "all seven reference-data collections",
+      "steps": [
+        "As employee, GET each collection",
+        "Anonymously, GET each collection"
+      ],
+      "expected_result": "Authenticated reads return 200 with seeded rows (13 statuses, 6 conditions, 5 categories, etc. per §10.4); anonymous → 401 envelope.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-026-02",
+      "requirement_ids": ["FR-026", "FR-025"],
+      "title": "Admin reference-data writes are audited",
+      "objective": "Verify admin create/update of a reference-data record succeeds and writes an AuditEvent with before/after.",
+      "priority": "P1",
+      "type": "API/functional + audit",
+      "preconditions": "Admin session.",
+      "test_data": "new supplier {name:'QA Supplier', code:'QASUP'}",
+      "steps": [
+        "POST /reference-data/suppliers as admin",
+        "PATCH the created record",
+        "Verify audit events for both operations"
+      ],
+      "expected_result": "201/200 responses; two AuditEvents with correct actor, target, and before/after; unique code constraint enforced on duplicates.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-FR-026-03",
+      "requirement_ids": ["FR-026", "BR-004"],
+      "title": "In-use reference values cannot be deleted (deactivate-not-delete)",
+      "objective": "Verify attempting to delete a reference value referenced by assets (e.g. a category or status in use) is rejected (FK PROTECT / documented error) and deactivation is the offered path.",
+      "priority": "P1",
+      "type": "API/integrity",
+      "preconditions": "Seeded category in use by assets; admin session.",
+      "test_data": "DELETE/PATCH deactivate on in-use category",
+      "steps": [
+        "Attempt DELETE on in-use category",
+        "PATCH active=false (deactivate) and verify assets retain the reference",
+        "Verify deactivated value excluded from create-form option lists"
+      ],
+      "expected_result": "Delete rejected with user-safe error; deactivation succeeds without breaking existing assets; deactivated values hidden from new-record selection.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+
+    {
+      "test_id": "TC-API-001",
+      "requirement_ids": ["§11.2", "NFR-007"],
+      "title": "Error envelope shape consistent across 400/401/403/404/409",
+      "objective": "Verify every non-2xx response from delivered endpoints matches {error:{code,message,field_errors,correlation_id,retryable}} with documented HTTP mapping and stable codes.",
+      "priority": "P0",
+      "type": "API/contract",
+      "preconditions": "Sessions for multiple roles.",
+      "test_data": "trigger each status class: invalid payload, no auth, forbidden role, missing UUID, stale version",
+      "steps": [
+        "Trigger each error class on /assets and /auth endpoints",
+        "Validate bodies against the envelope schema"
+      ],
+      "expected_result": "All errors conform to the envelope; codes from the documented set (VALIDATION_FAILED, AUTHENTICATION_REQUIRED, PERMISSION_DENIED, NOT_FOUND, VERSION_CONFLICT...); messages user-safe; no HTML error pages from API routes.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-API-002",
+      "requirement_ids": ["NFR-009", "§14"],
+      "title": "Correlation IDs generated and echoed end-to-end",
+      "objective": "Verify a client-supplied X-Correlation-ID is echoed in the response (and error envelope), and absent IDs are generated server-side; frontend wrapper attaches one per request.",
+      "priority": "P1",
+      "type": "API + frontend/contract",
+      "preconditions": "Stack up.",
+      "test_data": "request with X-Correlation-ID: <known uuid>; request without",
+      "steps": [
+        "Send both request variants to /assets and compare response headers/body",
+        "In browser devtools (or Playwright), verify SPA requests carry X-Correlation-ID"
+      ],
+      "expected_result": "Supplied ID echoed; missing ID replaced with a generated UUID; frontend attaches a UUIDv4 per request; error states surface the ID as a support reference.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-API-003",
+      "requirement_ids": ["D-09", "FR-005"],
+      "title": "Pagination envelope consistent across all list endpoints",
+      "objective": "Verify /assets, /saved-views, /reference-data/* and /assets/{id}/history all use the same {count,next,previous,results} envelope and page/page_size semantics.",
+      "priority": "P1",
+      "type": "API/contract",
+      "preconditions": "Seeded data.",
+      "test_data": "page/page_size variations per endpoint",
+      "steps": [
+        "Request page 1 of each list endpoint and compare envelope keys",
+        "Spot-check page 2 navigation on two endpoints"
+      ],
+      "expected_result": "Identical envelope semantics everywhere; next/previous URLs well-formed.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-API-004",
+      "requirement_ids": ["D-06", "FR-002"],
+      "title": "Money represented as decimal-string + currency object, never float",
+      "objective": "Verify any money field exposed (to finance-authorized roles) serializes as {amount: \"<decimal string>\", currency: \"XXX\"} and that JSON contains no binary floats for monetary values.",
+      "priority": "P1",
+      "type": "API/contract",
+      "preconditions": "Asset with purchase_price 1234.56 seeded; finance-authorized session.",
+      "test_data": "asset with price incl. trailing-zero values",
+      "steps": [
+        "GET the asset and inspect raw JSON for money fields",
+        "Create/update with amount '999999999999.99' boundary and verify round-trip"
+      ],
+      "expected_result": "Money serialized as string amounts with ISO currency; precision preserved at numeric(14,2) boundaries; no float artifacts (e.g. 1234.5600000001).",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-API-005",
+      "requirement_ids": ["§11.1", "§14", "STK"],
+      "title": "OpenAPI schema available, valid, and exportable",
+      "objective": "Verify /api/v1/schema/ serves a valid OpenAPI 3 document covering all delivered endpoints and that backend/openapi.json export works for frontend type generation.",
+      "priority": "P1",
+      "type": "API/contract + build",
+      "preconditions": "Backend running.",
+      "test_data": "schema endpoint; export script/management command",
+      "steps": [
+        "GET /api/v1/schema/ and parse as OpenAPI 3",
+        "Verify paths for auth, assets, reference-data, search, dashboard, saved-views, health exist",
+        "Run the documented export to backend/openapi.json and diff against served schema"
+      ],
+      "expected_result": "Valid schema with all delivered endpoints, error-envelope components, and security scheme; exported file matches served schema.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-API-006",
+      "requirement_ids": ["NFR-005"],
+      "title": "Health endpoints unauthenticated and infra-only",
+      "objective": "Verify /api/v1/health/live and /health/ready return 200 without authentication, readiness reflects DB connectivity, and neither leaks sensitive configuration.",
+      "priority": "P1",
+      "type": "API/ops",
+      "preconditions": "Stack up.",
+      "test_data": "none",
+      "steps": [
+        "GET both endpoints without cookies",
+        "Inspect bodies for secrets/config leakage",
+        "(If feasible) stop postgres and re-check readiness"
+      ],
+      "expected_result": "200 live always; ready 200 with DB up / failing status with DB down; bodies minimal (status only), no settings/secrets.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-API-007",
+      "requirement_ids": ["§13", "NFR-007"],
+      "title": "Unhandled exceptions return generic 500 with correlation ID only",
+      "objective": "Verify a forced server error returns 500 INTERNAL_ERROR envelope with correlation_id and no stack trace/settings leakage (DEBUG=false behavior).",
+      "priority": "P1",
+      "type": "API/error handling",
+      "preconditions": "Backend running with DEBUG=false-equivalent test settings; a route or fault-injection mechanism to force 500 (or review of delivered tests demonstrating it).",
+      "test_data": "fault-injection or backend's own 500 test",
+      "steps": [
+        "Trigger a 500 via the available mechanism",
+        "Inspect response body and headers"
+      ],
+      "expected_result": "Generic envelope {code: INTERNAL_ERROR, correlation_id, retryable as documented}; no traceback, no Django debug page; server-side log contains the trace with matching correlation ID.",
+      "status": "NOT_RUN",
+      "automation_status": "SEMI_AUTOMATED"
+    },
+
+    {
+      "test_id": "TC-NFR-007-01",
+      "requirement_ids": ["NFR-007", "§13"],
+      "title": "Security headers present on frontend and API responses",
+      "objective": "Verify responses carry X-Content-Type-Options: nosniff, Referrer-Policy, frame protection (frame-ancestors 'none' via CSP), and a restrictive CSP on HTML pages; HSTS where TLS is terminated.",
+      "priority": "P1",
+      "type": "Security/headers",
+      "preconditions": "Stack up.",
+      "test_data": "GET / (HTML) and GET /api/v1/assets (API)",
+      "steps": [
+        "Capture response headers for HTML and API responses",
+        "Check for required headers and CSP directives"
+      ],
+      "expected_result": "Required headers present per design §13; CSP restrictive (self + nonce-based bootstrap); no wildcard origins.",
+      "status": "NOT_RUN",
+      "automation_status": "SEMI_AUTOMATED"
+    },
+    {
+      "test_id": "TC-NFR-007-02",
+      "requirement_ids": ["NFR-007", "§13"],
+      "title": "CORS restricted to explicit allowlist with credentials",
+      "objective": "Verify cross-origin requests from non-allowlisted origins are rejected and Access-Control-Allow-Origin is never '*' when credentials are involved.",
+      "priority": "P1",
+      "type": "Security/CORS",
+      "preconditions": "Stack up.",
+      "test_data": "Origin: https://evil.example and Origin: http://localhost:3000",
+      "steps": [
+        "Send preflight OPTIONS and actual GET with each Origin to /api/v1/assets",
+        "Inspect ACAO/ACAC headers"
+      ],
+      "expected_result": "Allowlisted origin reflected with credentials allowed; evil origin receives no ACAO header (browser would block); never ACAO:* alongside ACAC:true.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-NFR-007-03",
+      "requirement_ids": ["NFR-007"],
+      "title": "Injection attempts in search/filter inputs are neutralized",
+      "objective": "Verify SQL-injection strings in q and filter params cause no error, no data anomaly, and are treated as literal text (ORM parameterization).",
+      "priority": "P1",
+      "type": "Security/injection",
+      "preconditions": "Operator session.",
+      "test_data": "q=' OR '1'='1 ; q='; DROP TABLE assets;-- ; filter value with UNION SELECT",
+      "steps": [
+        "Send each payload to /search/assets and /assets?status=...",
+        "Verify responses and that assets remain intact afterwards"
+      ],
+      "expected_result": "200 with normal (likely empty) results or 400 validation — never 500; database intact; payloads treated as literals.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_API"
+    },
+    {
+      "test_id": "TC-NFR-007-04",
+      "requirement_ids": ["NFR-007", "FR-001"],
+      "title": "Session/CSRF cookie attributes verified",
+      "objective": "Verify sessionid and csrftoken cookie attributes: sessionid HttpOnly + SameSite=Lax (+Secure off-localhost); csrftoken readable by SPA per design but SameSite=Lax; sensible expiry (12h absolute default).",
+      "priority": "P1",
+      "type": "Security/cookies",
+      "preconditions": "Stack up; login possible.",
+      "test_data": "operator login",
+      "steps": [
+        "Login and capture all Set-Cookie headers",
+        "Validate attributes and lifetimes against §12 defaults"
+      ],
+      "expected_result": "Attributes match design; no session data in localStorage (verify via browser inspection).",
+      "status": "NOT_RUN",
+      "automation_status": "SEMI_AUTOMATED"
+    },
+    {
+      "test_id": "TC-NFR-007-05",
+      "requirement_ids": ["NFR-007", "STK"],
+      "title": "No secrets committed; .env ignored; logs mask credentials",
+      "objective": "Verify the repository contains no real secrets (scan tracked files), .env is git-ignored with only .env.example committed, and application logs do not contain passwords/tokens/session IDs.",
+      "priority": "P0",
+      "type": "Security/hygiene",
+      "preconditions": "Workspace checkout.",
+      "test_data": "grep patterns: SECRET_KEY=, password=, BEGIN PRIVATE KEY, aws/session tokens",
+      "steps": [
+        "Search tracked files for secret-like patterns (excluding .env.example placeholders and README dev-password documentation)",
+        "Verify .gitignore covers .env",
+        "Trigger login + asset create and inspect backend logs for credential/session leakage"
+      ],
+      "expected_result": "No real secrets in repo; .env ignored; logs structured JSON with masked credentials/PII per §13.",
+      "status": "NOT_RUN",
+      "automation_status": "SEMI_AUTOMATED"
+    },
+
+    {
+      "test_id": "TC-NFR-002-01",
+      "requirement_ids": ["NFR-002", "LAY"],
+      "title": "No horizontal page scroll at 320px on delivered pages",
+      "objective": "Verify login, dashboard, asset register, asset detail, and create/edit pages render at 320px width without page-level horizontal scrolling and with all primary actions reachable.",
+      "priority": "P0",
+      "type": "Responsive/E2E",
+      "preconditions": "App running; Playwright viewport matrix.",
+      "test_data": "viewport 320x568; also 480, 768, 1024, 1440 smoke",
+      "steps": [
+        "Load each delivered page at each viewport",
+        "Assert document scrollWidth <= viewport width",
+        "Verify primary actions (sign in, save, pagination) visible/operable at 320px"
+      ],
+      "expected_result": "No horizontal scroll at any matrix size; layouts adapt per §7 breakpoints; touch targets ≥44x44px on compact sizes.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_E2E"
+    },
+    {
+      "test_id": "TC-NFR-002-02",
+      "requirement_ids": ["NFR-002", "LAY"],
+      "title": "Asset register switches table↔cards and filters become a bottom sheet on mobile",
+      "objective": "Verify desktop (≥1024px) shows the sortable table with sticky header while mobile shows card list; filter controls move into a bottom sheet with always-visible Apply/Clear; pagination becomes prev/next on mobile.",
+      "priority": "P1",
+      "type": "Responsive/E2E",
+      "preconditions": "App running; seeded assets.",
+      "test_data": "viewports 1440x900 and 390x844",
+      "steps": [
+        "At desktop width: verify table, sortable columns, numbered pagination",
+        "At mobile width: verify cards contain tag, name, status badge, category/model, custodian, location; open filter sheet; apply a filter",
+        "Verify same filtered results across both layouts"
+      ],
+      "expected_result": "Both presentations function equivalently; card content per §7; filter sheet Apply/Clear always visible; no infinite scroll.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_E2E"
+    },
+    {
+      "test_id": "TC-NFR-002-03",
+      "requirement_ids": ["NFR-002", "NFR-003", "LAY"],
+      "title": "Mobile navigation: bottom nav with aria-current and drawer for secondary items",
+      "objective": "Verify mobile shell shows top app bar + bottom navigation (Home, Assets, Scan, Tasks, More) with the active section programmatically identifiable, and a drawer exposes secondary items.",
+      "priority": "P1",
+      "type": "Responsive + accessibility/E2E",
+      "preconditions": "App running at mobile viewport.",
+      "test_data": "viewport 390x844",
+      "steps": [
+        "Navigate between sections via bottom nav",
+        "Check aria-current on the active item",
+        "Open More/drawer and verify secondary destinations; verify Scan/Tasks show 'coming soon' states per cycle plan"
+      ],
+      "expected_result": "Bottom nav present with correct items; aria-current reflects route; drawer works with focus management; stubs labeled accessibly.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_E2E"
+    },
+
+    {
+      "test_id": "TC-NFR-003-01",
+      "requirement_ids": ["NFR-003", "FR-001"],
+      "title": "Keyboard-only sign-in flow",
+      "objective": "Verify the entire sign-in flow (load /login, complete fields, submit, handle an error, retry, succeed, land on dashboard) is operable with keyboard alone, with visible focus at all times.",
+      "priority": "P0",
+      "type": "Accessibility/manual+E2E",
+      "preconditions": "App running.",
+      "test_data": "operator credentials; one intentional bad attempt",
+      "steps": [
+        "Tab from skip link through form; verify focus order and visible focus rings",
+        "Submit with wrong password; verify error is announced/focused",
+        "Correct and submit; verify focus lands sensibly on dashboard"
+      ],
+      "expected_result": "Full flow completable without a mouse; focus always visible; error message associated with form and conveyed to assistive tech.",
+      "status": "NOT_RUN",
+      "automation_status": "SEMI_AUTOMATED"
+    },
+    {
+      "test_id": "TC-NFR-003-02",
+      "requirement_ids": ["NFR-003", "FR-003", "§8.5"],
+      "title": "Keyboard-only asset creation with error-summary focus",
+      "objective": "Verify the create-asset form is fully keyboard operable: required fields marked (text+symbol), validation on blur/submit, failed submit moves focus to error summary, and duplicate-warning panel is reachable and dismissible by keyboard.",
+      "priority": "P0",
+      "type": "Accessibility/manual+E2E",
+      "preconditions": "Operator login; create page.",
+      "test_data": "payload missing a required field; payload triggering duplicate warning",
+      "steps": [
+        "Complete form with keyboard only; submit with a missing required field",
+        "Verify focus moves to error summary and links jump to fields",
+        "Trigger duplicate warning; navigate the warning panel by keyboard; complete save"
+      ],
+      "expected_result": "Entire journey keyboard-completable; no focus traps; labels are explicit (no placeholder-only labels); warnings announced.",
+      "status": "NOT_RUN",
+      "automation_status": "SEMI_AUTOMATED"
+    },
+    {
+      "test_id": "TC-NFR-003-03",
+      "requirement_ids": ["NFR-003"],
+      "title": "axe-core automated scan passes on delivered pages",
+      "objective": "Verify axe-core reports zero critical/serious violations on /login, /, /assets, /assets/new, /assets/[id], /assets/[id]/edit, /assets/[id]/history, and error pages (403/404).",
+      "priority": "P0",
+      "type": "Accessibility/automated",
+      "preconditions": "Playwright + axe-core wired; app running; authenticated contexts for private pages.",
+      "test_data": "page list above, desktop + one mobile viewport",
+      "steps": [
+        "Run axe scan per page and viewport",
+        "Record violations by rule and severity"
+      ],
+      "expected_result": "0 critical and 0 serious violations; any moderate/minor findings logged as defects with severity.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_E2E"
+    },
+    {
+      "test_id": "TC-NFR-003-04",
+      "requirement_ids": ["NFR-003", "LAY"],
+      "title": "Landmarks, skip link, and heading structure",
+      "objective": "Verify each page has a skip link as first focusable element targeting main content, semantic landmarks (header/nav/main/footer), logical heading hierarchy, and Escape closes any overlay with focus restored.",
+      "priority": "P1",
+      "type": "Accessibility/E2E",
+      "preconditions": "App running.",
+      "test_data": "delivered pages; an overlay (confirm dialog or filter sheet)",
+      "steps": [
+        "Tab once from page top — verify skip link appears and works",
+        "Audit landmark roles and heading levels programmatically",
+        "Open an overlay, press Escape, verify it closes and focus returns to the trigger"
+      ],
+      "expected_result": "Skip link functional; landmarks complete; no skipped heading levels; overlay Escape behavior correct with focus restore.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_E2E"
+    },
+    {
+      "test_id": "TC-NFR-003-05",
+      "requirement_ids": ["NFR-003", "LAY", "§7"],
+      "title": "Status/condition badges never rely on color alone",
+      "objective": "Verify every status and condition badge combines icon + text label + semantic color and exposes screen-reader text, per the layout §5.3 mapping.",
+      "priority": "P1",
+      "type": "Accessibility/E2E + unit",
+      "preconditions": "Assets with varied statuses/conditions seeded.",
+      "test_data": "asset list + detail at both desktop and mobile",
+      "steps": [
+        "Inspect badges in list cards, table, and detail header",
+        "Verify each has a visible text label, an icon, and accessible naming",
+        "Cross-check badge component unit tests cover all seeded status/condition codes"
+      ],
+      "expected_result": "No status conveyed by color alone; labels match §5.3 mapping; unknown codes degrade gracefully to a neutral labeled badge.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_E2E"
+    },
+    {
+      "test_id": "TC-NFR-003-06",
+      "requirement_ids": ["NFR-003", "LAY", "§7"],
+      "title": "Dark-theme token contrast spot check (WCAG AA)",
+      "objective": "Verify text/background pairings from the §7 token palette meet contrast ≥4.5:1 for normal text and ≥3:1 for large text/UI components, computed from the shipped CSS custom properties (canvas #090D14, surface #121A26, text #F3F6FA/#B8C4D1/#8795A6/#667384, accent #5EA2FF, etc.).",
+      "priority": "P1",
+      "type": "Accessibility/computed check",
+      "preconditions": "Built frontend with tokens in CSS.",
+      "test_data": "token pairs actually used: body text on canvas/surface, muted text, accent on surface, on-primary text, danger/warning/success text on badges, focus ring visibility",
+      "steps": [
+        "Extract computed colors for representative components (body, muted text, badges, buttons, inputs, focus ring)",
+        "Compute contrast ratios against their backgrounds",
+        "Flag any pairing below AA thresholds"
+      ],
+      "expected_result": "All shipped pairings meet AA; components reference semantic tokens (no hard-coded hex in components per §7).",
+      "status": "NOT_RUN",
+      "automation_status": "SEMI_AUTOMATED"
+    },
+    {
+      "test_id": "TC-NFR-003-07",
+      "requirement_ids": ["NFR-003", "§7"],
+      "title": "No flash of unstyled/light theme on load",
+      "objective": "Verify the SSR head includes the color-scheme/bootstrap script and <html class=\"dark\"> so first paint is dark, with no light-theme flash on hard reload or deep-link load.",
+      "priority": "P2",
+      "type": "E2E/visual",
+      "preconditions": "Production build served (or SSR dev) stack.",
+      "test_data": "hard reload of /login and a deep link",
+      "steps": [
+        "Capture screenshots at earliest paint during navigation",
+        "Inspect SSR HTML head for color-scheme script and dark class"
+      ],
+      "expected_result": "First paint is dark; head contains the bootstrap mechanism per §7.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_E2E"
+    },
+
+    {
+      "test_id": "TC-STK-001",
+      "requirement_ids": ["STK", "§16", "cycle DoD"],
+      "title": "Clean install: dev-up + migrate + seed yields working app",
+      "objective": "Verify from a clean checkout state that ./scripts/dev-up.sh && ./scripts/migrate.sh && ./scripts/seed-dev.sh brings up a working app at localhost:3000 backed by localhost:8000.",
+      "priority": "P0",
+      "type": "Installation/smoke",
+      "preconditions": "Clean environment (containers/volumes down); .env created from .env.example.",
+      "test_data": "documented setup commands from README",
+      "steps": [
+        "Run the three scripts in order; capture output",
+        "Verify frontend responds at :3000 and backend /api/v1/health/ready at :8000",
+        "Log in via UI with seeded admin credentials"
+      ],
+      "expected_result": "All scripts exit 0 with clear env banners; app reachable end-to-end; seeded login works; README instructions match reality.",
+      "status": "NOT_RUN",
+      "automation_status": "SEMI_AUTOMATED"
+    },
+    {
+      "test_id": "TC-STK-002",
+      "requirement_ids": ["STK", "§15.3"],
+      "title": "Backend quality gates pass",
+      "objective": "Verify ruff format --check, ruff check, mypy, makemigrations --check --dry-run, check --deploy (safe CI settings), and pytest all pass in the backend.",
+      "priority": "P0",
+      "type": "Build/CI",
+      "preconditions": "Backend deliverables present.",
+      "test_data": "commands per design §15.3",
+      "steps": [
+        "Run each gate via the available allowlisted commands",
+        "Record pass/fail and counts (tests run, coverage if reported)"
+      ],
+      "expected_result": "All gates exit 0; pytest suite includes model/constraint, API, permission, concurrency-409, and audit-completeness tests per cycle plan backend deliverable #9.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_UNIT"
+    },
+    {
+      "test_id": "TC-STK-003",
+      "requirement_ids": ["STK", "§15.3"],
+      "title": "Frontend quality gates pass",
+      "objective": "Verify pnpm lint, pnpm typecheck, pnpm test, and pnpm build all pass; unit tests cover status badge, filter serialization, and API error mapping per cycle plan.",
+      "priority": "P0",
+      "type": "Build/CI",
+      "preconditions": "Frontend deliverables present with committed lockfile.",
+      "test_data": "commands per design §15.3",
+      "steps": [
+        "Run each gate via allowlisted commands",
+        "Record results"
+      ],
+      "expected_result": "All gates exit 0; production build succeeds; lockfile present and install reproducible.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_UNIT"
+    },
+    {
+      "test_id": "TC-STK-004",
+      "requirement_ids": ["STK", "§16.1"],
+      "title": "Repo hygiene: lockfiles, .env.example, .gitignore, no committed secrets",
+      "objective": "Verify pnpm lockfile and uv.lock (or documented alternative) committed, root .env.example present with placeholders only, .env git-ignored, and no .env or secrets tracked.",
+      "priority": "P0",
+      "type": "Repo hygiene",
+      "preconditions": "Workspace checkout.",
+      "test_data": "file presence + content checks",
+      "steps": [
+        "Check for pnpm-lock.yaml, uv.lock, .env.example, .gitignore entries",
+        "Verify .env is not tracked and .env.example contains no real values"
+      ],
+      "expected_result": "All artifacts correct; pairs with TC-NFR-007-05 for secret scanning.",
+      "status": "NOT_RUN",
+      "automation_status": "SEMI_AUTOMATED"
+    },
+    {
+      "test_id": "TC-STK-005",
+      "requirement_ids": ["STK", "§16.1"],
+      "title": "Scripts are idempotent and re-runnable",
+      "objective": "Verify dev-up/migrate/seed/check/dev-down scripts can be run repeatedly without failure or duplicate seed data, use set -euo pipefail, and print an environment banner.",
+      "priority": "P1",
+      "type": "Ops/reliability",
+      "preconditions": "Scripts exist.",
+      "test_data": "run migrate.sh and seed-dev.sh twice",
+      "steps": [
+        "Run migrate + seed twice; compare seeded counts (no duplication)",
+        "Run check.sh; run dev-down.sh and dev-up.sh cycle"
+      ],
+      "expected_result": "Second runs succeed; seed counts stable (idempotent); failures, if any, exit non-zero with clear messages.",
+      "status": "NOT_RUN",
+      "automation_status": "SEMI_AUTOMATED"
+    },
+    {
+      "test_id": "TC-STK-006",
+      "requirement_ids": ["STK", "D-13", "NFR-007"],
+      "title": "Production settings fail fast on missing/insecure env",
+      "objective": "Verify config.settings.production refuses to start (or fails checks loudly) when SECRET_KEY, DB config, ALLOWED_HOSTS, or CORS/CSRF origins are missing/insecure, and enforces DEBUG=false.",
+      "priority": "P1",
+      "type": "Config/security",
+      "preconditions": "Ability to invoke Django checks against production settings in test harness.",
+      "test_data": "env variants: missing SECRET_KEY; DEBUG=true attempt; wildcard ALLOWED_HOSTS",
+      "steps": [
+        "Run check/startup with each misconfiguration",
+        "Verify failure mode and message clarity"
+      ],
+      "expected_result": "Each misconfiguration blocks startup with a clear error; no silent insecure defaults.",
+      "status": "NOT_RUN",
+      "automation_status": "SEMI_AUTOMATED"
+    },
+
+    {
+      "test_id": "TC-J6-01",
+      "requirement_ids": ["FR-001", "FR-005", "FR-004", "J-6"],
+      "title": "E2E Journey J-6: sign in, search, open an asset",
+      "objective": "Verify the canonical journey: user signs in, uses global search (exact tag first, keyboard-navigable suggestions), opens the asset detail, and sees identity header + overview + history tab.",
+      "priority": "P0",
+      "type": "E2E/journey",
+      "preconditions": "Stack seeded; operator credentials; known asset tag.",
+      "test_data": "seeded asset tag",
+      "steps": [
+        "Sign in via /login",
+        "Type tag into global search; navigate suggestions with arrow keys + Enter",
+        "Land on asset detail; verify identity header fields and history tab loads events",
+        "Sign out"
+      ],
+      "expected_result": "Journey completes without errors; exact-tag result first; detail renders scoped data; history tab shows lifecycle events; session ends cleanly on sign-out.",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_E2E"
+    },
+    {
+      "test_id": "TC-J1-01",
+      "requirement_ids": ["FR-003", "FR-004", "J-1"],
+      "title": "E2E Journey J-1 (registration slice): create a new laptop",
+      "objective": "Verify the Cycle 1 slice of J-1: operator opens /assets/new, completes the category-driven form for a laptop, sees duplicate warning when reusing an existing serial, saves, and lands on the created asset's detail page with a success confirmation.",
+      "priority": "P0",
+      "type": "E2E/journey",
+      "preconditions": "Stack seeded; operator credentials; an existing serial number known.",
+      "test_data": "new laptop payload; duplicate serial scenario",
+      "steps": [
+        "Navigate to /assets/new; verify required markers and category-driven fields",
+        "Enter existing serial — verify duplicate warning panel appears and is non-blocking",
+        "Change serial to unique value; submit",
+        "Verify redirect to detail page, success feedback, and the asset appears in register search"
+      ],
+      "expected_result": "Asset created and visible; duplicate-warning UX non-blocking and informative; no double-submit on repeated clicks (duplicate-submit prevention); success only shown after confirmed backend response (no optimistic completion).",
+      "status": "NOT_RUN",
+      "automation_status": "AUTOMATED_E2E"
+    }
+  ]
+}

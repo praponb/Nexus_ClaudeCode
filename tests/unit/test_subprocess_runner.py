@@ -7,7 +7,6 @@ from types import SimpleNamespace
 
 import pytest
 
-from agentic_builder.errors import CommandNotAllowlistedError
 from agentic_builder.tools.subprocess_runner import ALLOWLIST, run_allowlisted_command
 
 
@@ -19,18 +18,23 @@ def _tool_context(workspace: Path, run_dir: Path, dry_run: bool = False) -> Simp
 
 @pytest.mark.asyncio
 async def test_rejects_command_not_on_allowlist(workspace: Path, tmp_path: Path) -> None:
+    # A command outside the allowlist is not fatal -- it returns a structured
+    # error so one agent's mistaken command_key doesn't cancel concurrent
+    # sibling agents' legitimate work (asyncio.gather cancels all tasks on
+    # any single unhandled exception).
     tool_context = _tool_context(workspace, tmp_path / "run")
-    with pytest.raises(CommandNotAllowlistedError):
-        await run_allowlisted_command(tool_context, "rm -rf /")
+    result = await run_allowlisted_command(tool_context, "rm -rf /")
+    assert "error" in result
+    assert "available_commands" in result
 
 
 @pytest.mark.asyncio
 async def test_rejects_unsafe_extra_args(workspace: Path, tmp_path: Path) -> None:
     tool_context = _tool_context(workspace, tmp_path / "run")
-    with pytest.raises(CommandNotAllowlistedError):
-        await run_allowlisted_command(
-            tool_context, "pytest", extra_args_json=json.dumps(["; rm -rf /"])
-        )
+    result = await run_allowlisted_command(
+        tool_context, "pytest", extra_args_json=json.dumps(["; rm -rf /"])
+    )
+    assert "error" in result
 
 
 @pytest.mark.asyncio

@@ -1,0 +1,125 @@
+[
+  {
+    "test_id": "TC-NFR-007-01",
+    "requirement_ids": ["NFR-007"],
+    "title": "Security response headers present",
+    "objective": "Verify API and frontend responses include the documented security headers.",
+    "priority": "High",
+    "type": "Security/HTTP",
+    "preconditions": "stack running.",
+    "test_data": "GET /api/v1/auth/me (401 ok), GET / (frontend HTML)",
+    "steps": [
+      "Inspect response headers on backend API responses and frontend pages.",
+      "Check for: X-Content-Type-Options: nosniff, Referrer-Policy, frame protection (frame-ancestors 'none' in CSP or X-Frame-Options), Content-Security-Policy on HTML, HSTS where TLS terminates (note if N/A on localhost)."
+    ],
+    "expected_result": "Documented headers present per design §13; CSP restrictive (self + nonce-based bootstrap; no unsafe-inline for scripts beyond documented bootstrap); HSTS noted as TLS-environment-dependent (document if not applicable on localhost).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-NFR-007-02",
+    "requirement_ids": ["NFR-007"],
+    "title": "XSS — stored injection in asset fields escaped on render",
+    "objective": "Verify script payloads stored in text fields (name, description, notes if delivered) render as inert text in list, detail, search suggestions, and dashboard.",
+    "priority": "Critical",
+    "type": "Security/XSS",
+    "preconditions": "operator session; ability to create asset with payload strings.",
+    "test_data": "name: '<script>window.__xss=1</script>', description: '<img src=x onerror=window.__xss=2>', tag-safe variants with quotes/unicode",
+    "steps": [
+      "Create asset with payloads via API (accepted as text or rejected — record which).",
+      "Open list, detail, search suggestions, dashboard recent activity in a real browser.",
+      "Check window.__xss is undefined and no alert/script execution; inspect DOM for escaped output."
+    ],
+    "expected_result": "Payloads never execute anywhere; rendered as literal text (framework escaping); if server rejects such input, rejection is a documented 400 — either way no execution and no 500.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-NFR-007-03",
+    "requirement_ids": ["NFR-007"],
+    "title": "SQL injection probes on search and filter params",
+    "objective": "Verify ORM parameterization: classic injection strings in q, filter, ordering, and path params cause no errors, no data exposure, no behavior change.",
+    "priority": "Critical",
+    "type": "Security/Injection",
+    "preconditions": "operator session.",
+    "test_data": "q=\"' OR '1'='1\"; q='; DROP TABLE assets;--; status=1' UNION SELECT; uuid path with crafted strings; ordering=';--",
+    "steps": [
+      "Send each probe to /search/assets, /assets filters, ordering, and /assets/<crafted-uuid>.",
+      "Record status codes and bodies; verify normal result sets afterward (table intact)."
+    ],
+    "expected_result": "Probes treated as literal values: empty/normal results, 400 for invalid formats, 404 for invalid UUIDs; never 500; database intact afterward; no error message leaks SQL or schema details.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-NFR-007-04",
+    "requirement_ids": ["NFR-007", "FR-001"],
+    "title": "Session cookie security attributes",
+    "objective": "Verify sessionid and csrftoken cookies carry correct flags per environment.",
+    "priority": "High",
+    "type": "Security/HTTP",
+    "preconditions": "stack running; login flow executable.",
+    "test_data": "login response Set-Cookie headers",
+    "steps": [
+      "Perform login; capture Set-Cookie for sessionid and csrftoken.",
+      "Verify flags: sessionid HttpOnly + SameSite=Lax (+Secure when not localhost); csrftoken SameSite=Lax (HttpOnly not required/expected per Django SPA pattern).",
+      "Verify sessionid not accessible via document.cookie in the UI."
+    ],
+    "expected_result": "Flags match design §12; session cookie invisible to JS; no auth tokens in localStorage/sessionStorage (inspect browser storage after login).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-NFR-007-05",
+    "requirement_ids": ["NFR-007", "NFR-008"],
+    "title": "No secrets or stack traces in responses/logs/browser",
+    "objective": "Verify error paths never leak stack traces/SQL/env values; responses contain no passwords/tokens; browser storage holds no sensitive data; server logs mask credentials.",
+    "priority": "High",
+    "type": "Security/InfoDisclosure",
+    "preconditions": "stack running; access to backend container logs.",
+    "test_data": "triggered 400/401/403/404/409/500 responses; login request in logs",
+    "steps": [
+      "Trigger each error class; scan bodies for 'Traceback', 'django', file paths, SQL fragments.",
+      "Review backend logs for the login attempt — password must not appear.",
+      "Inspect browser localStorage/sessionStorage after a full UI session."
+    ],
+    "expected_result": "Error bodies contain only the envelope; logs structured JSON with masked credentials; browser storage contains no tokens/passwords/PII beyond non-sensitive UI prefs.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable + log inspection"
+  },
+  {
+    "test_id": "TC-NFR-007-06",
+    "requirement_ids": ["NFR-007"],
+    "title": "CORS allowlist enforced",
+    "objective": "Verify cross-origin requests from non-allowlisted origins are rejected and no wildcard-with-credentials exists.",
+    "priority": "Medium",
+    "type": "Security/HTTP",
+    "preconditions": "stack running.",
+    "test_data": "Origin: http://evil.example.com on API GET and preflight OPTIONS for POST /assets",
+    "steps": [
+      "Send API requests with a hostile Origin header.",
+      "Send OPTIONS preflight with hostile origin + credentials mode.",
+      "Verify allowed origin (frontend URL) still works."
+    ],
+    "expected_result": "Hostile origins receive no Access-Control-Allow-Origin header (browser would block); Access-Control-Allow-Credentials never combined with '*'; allowlisted origin functions normally.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-NFR-007-07",
+    "requirement_ids": ["NFR-007"],
+    "title": "Production settings fail fast on insecure/missing config",
+    "objective": "Verify config.settings.production refuses to start with DEBUG=true or missing secret/DB/allowed-hosts env (D-13), and local auth cannot be enabled in production without explicit override.",
+    "priority": "High",
+    "type": "Security/Config",
+    "preconditions": "backend codebase; pytest or shell invocation of Django check with production settings in a disposable env.",
+    "test_data": "env variants: missing SECRET_KEY; DEBUG=true with APP_ENV=production; LOCAL_AUTH_ENABLED unset with APP_ENV=production",
+    "steps": [
+      "Attempt startup/system-check with each invalid env combination (in test harness, not the running stack).",
+      "Record failure behavior and messages."
+    ],
+    "expected_result": "Startup fails fast with clear error for each insecure combination; no silent fallback to dev defaults; loud warning/failure for local auth under APP_ENV=production unless explicit override set.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (pytest/subprocess)"
+  }
+]

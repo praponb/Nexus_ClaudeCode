@@ -1,0 +1,1387 @@
+{
+  "TC-API-001": {
+    "actual_result": "Error envelope verified across executed suites (400/401/403/404/409/415/429 codes incl. VALIDATION_FAILED, PERMISSION_DENIED, RATE_LIMITED, IDEMPOTENCY_KEY_REUSED, IMPORT_ROW_INVALID).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-API-001"
+  },
+  "TC-API-002": {
+    "actual_result": "OpenAPI contract tests green (6) incl. drift guard against committed backend/openapi.json.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-API-002"
+  },
+  "TC-API-003": {
+    "actual_result": "Correlation echo verified (contract suite).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-API-003"
+  },
+  "TC-API-004": {
+    "actual_result": "Money {amount decimal-string, currency} verified (maintenance cost, export); datetimes ISO via serializers.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-API-004"
+  },
+  "TC-API-005": {
+    "actual_result": "Health live/ready unauthenticated 200, minimal payload (test_health 2 passed).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-API-005"
+  },
+  "TC-API-006": {
+    "actual_result": "Reference-data readable by all roles; writes admin-only (403 PERMISSION_DENIED for operator); transition rules listed.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-API-006"
+  },
+  "TC-D08-01": {
+    "actual_result": "Asset create with Idempotency-Key replayed \u2192 same asset uuid, exactly one Asset.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend (test_idempotent_asset_create)",
+    "status": "PASSED",
+    "test_id": "TC-D08-01"
+  },
+  "TC-D08-02": {
+    "actual_result": "Same key + different payload \u2192 409 IDEMPOTENCY_KEY_REUSED.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-D08-02"
+  },
+  "TC-D08-03": {
+    "actual_result": "NOW FULLY VERIFIED: replay exactly-once on transfer, return, reserve (C3) + assign, maintenance create, stocktake observation (C2) + dispose (C3 test_dispose_idempotent_replay); import commit safely repeatable.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend (test_idempotency_replay.py, test_retire_dispose_api.py)",
+    "status": "PASSED",
+    "test_id": "TC-D08-03"
+  },
+  "TC-D08-04": {
+    "actual_result": "useApi.ts inspection: retries only for GET (retries=0 for all unsafe methods \u2014 no blind unsafe retries), X-Correlation-ID on every request, CSRF header on non-GET, 401 session-expired flag, 15s/60s timeouts. Frontend 77 unit tests green.",
+    "cycle_last_executed": 2,
+    "evidence_path": "inspection: frontend/app/composables/useApi.ts + npm test output",
+    "status": "PASSED",
+    "test_id": "TC-D08-04"
+  },
+  "TC-DEF-001-01": {
+    "actual_result": "Root compose.yaml absent. backend/compose.yaml exists and is complete (postgres:18-alpine, redis:7, backend, celery-worker, celery-beat, frontend, healthchecks, non-default-env placeholders) but documented root bootstrap requires a manual copy step; Docker unavailable here so boot unverified.",
+    "cycle_last_executed": 2,
+    "defect_id": "DEF-101",
+    "evidence_path": "inspection: workspace root + backend/compose.yaml",
+    "status": "FAILED",
+    "test_id": "TC-DEF-001-01"
+  },
+  "TC-DEF-002-01": {
+    "actual_result": "Root .env.example absent. backend/.env.example verified complete + placeholder-only; .gitignore ignores .env/.env.* with !.env.example exception. Placement requirement (repo root, design \u00a716.1) unmet.",
+    "cycle_last_executed": 2,
+    "defect_id": "DEF-102",
+    "evidence_path": "inspection: workspace root + backend/.env.example + .gitignore",
+    "status": "FAILED",
+    "test_id": "TC-DEF-002-01"
+  },
+  "TC-DEF-003-01": {
+    "actual_result": "Idempotency-Key landed and verified by executed tests (TC-D08-01/02 + assign/maintenance/observation replay). DEF-003/ADR-004 closed.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-DEF-003-01"
+  },
+  "TC-DEF-004-01": {
+    "actual_result": "uv.lock still absent, but ADR-003 rationale re-documented in backend README (no uv+network in environment; Docker installs from pyproject). Accepted-risk carry per test criteria; re-verify in uv-capable env.",
+    "cycle_last_executed": 2,
+    "defect_id": "DEF-103",
+    "evidence_path": "inspection: backend/README.md; pip freeze (no uv)",
+    "status": "PASSED",
+    "test_id": "TC-DEF-004-01"
+  },
+  "TC-DEF-005-01": {
+    "actual_result": "npm audit is not on the command allowlist; npm_list/npm_install cannot assess vulnerabilities. Cannot verify the Cycle-1 critical transitive dev dependency status.",
+    "cycle_last_executed": 2,
+    "evidence_path": "allowlist probe",
+    "status": "BLOCKED",
+    "test_id": "TC-DEF-005-01"
+  },
+  "TC-DEF-005-02": {
+    "actual_result": "No disposition found: frontend README deviations and backend README contain no mention of the Cycle-1 npm-audit critical; npm audit remains non-allowlisted so fix cannot be verified. Per test criteria, absence of both fix and written rationale is a failure.",
+    "cycle_last_executed": 3,
+    "defect_id": "DEF-104",
+    "evidence_path": "inspection: frontend/README.md, backend/README.md, allowlist probe",
+    "status": "FAILED",
+    "test_id": "TC-DEF-005-02"
+  },
+  "TC-DEF-006-01": {
+    "actual_result": "DELETE on in-use department \u2192 200, row preserved with active=false, repeat DELETE idempotent, audit event reference.department.deactivate recorded; non-admin write \u2192 403. DEF-006/BR-004 closed.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend (test_security.py)",
+    "status": "PASSED",
+    "test_id": "TC-DEF-006-01"
+  },
+  "TC-DEF-101-01": {
+    "actual_result": "ADR-006 verified: dev-up.sh auto-copies both canonical files to root only when absent (non-clobber, idempotent), set -euo pipefail, banners; .env created from .env.example. Full boot evidence remains Docker-blocked (noted). DEF-101/DEF-102 closed procedurally.",
+    "cycle_last_executed": 3,
+    "evidence_path": "inspection: scripts/dev-up.sh",
+    "status": "PASSED",
+    "test_id": "TC-DEF-101-01"
+  },
+  "TC-DEF-103-01": {
+    "actual_result": "uv.lock still absent; backend README re-asserts ADR-003 accurately ('still pending; risk-accepted for release'). Documented-risk carry verified truthful \u2014 no uv in any available environment.",
+    "cycle_last_executed": 3,
+    "evidence_path": "inspection: backend/README.md; backend/uv.lock absence",
+    "status": "PASSED",
+    "test_id": "TC-DEF-103-01"
+  },
+  "TC-E2E-J1-01": {
+    "actual_result": "Browser unavailable (carried from C1).",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-E2E-J1-01"
+  },
+  "TC-E2E-J1-02": {
+    "actual_result": "Browser unavailable (carried from C2).",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-E2E-J1-02"
+  },
+  "TC-E2E-J2-01": {
+    "actual_result": "Browser unavailable (carried from C2).",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-E2E-J2-01"
+  },
+  "TC-E2E-J3-01": {
+    "actual_result": "Stocktake E2E requires browser.",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-E2E-J3-01"
+  },
+  "TC-E2E-J4-01": {
+    "actual_result": "Browser unavailable (carried from C2).",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-E2E-J4-01"
+  },
+  "TC-E2E-J5-01": {
+    "actual_result": "J-5 E2E requires browser runner.",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-E2E-J5-01"
+  },
+  "TC-E2E-J6-01": {
+    "actual_result": "Browser unavailable (carried from C1).",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-E2E-J6-01"
+  },
+  "TC-FR-001-01": {
+    "actual_result": "Re-affirmed: test_auth_api (7 tests) green this cycle; login/me contract verified.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-001-01"
+  },
+  "TC-FR-001-02": {
+    "actual_result": "Re-affirmed via auth suite (generic 401 on bad credentials; rate-limit test asserts 401 before 429).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-001-02"
+  },
+  "TC-FR-001-03": {
+    "actual_result": "Re-affirmed via auth suite (logout invalidation).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-001-03"
+  },
+  "TC-FR-001-04": {
+    "actual_result": "Re-affirmed: unauthenticated requests rejected; health endpoints open (test_health 2 passed).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-001-04"
+  },
+  "TC-FR-001-05": {
+    "actual_result": "NOW VERIFIED (was BLOCKED C1): POST without CSRF \u2192 403 with enforce_csrf_checks; with valid token \u2192 201.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend (test_security.py)",
+    "status": "PASSED",
+    "test_id": "TC-FR-001-05"
+  },
+  "TC-FR-001-06": {
+    "actual_result": "UI deep-link sign-in flow requires browser (carried).",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-001-06"
+  },
+  "TC-FR-001-07": {
+    "actual_result": "Session-expiry UX requires browser (carried).",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-001-07"
+  },
+  "TC-FR-001-08": {
+    "actual_result": "Re-affirmed via auth + audit suites (login/logout audit events).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-001-08"
+  },
+  "TC-FR-001-09": {
+    "actual_result": "NOW VERIFIED (was BLOCKED C1): 4th rapid failed login \u2192 429 RATE_LIMITED with retryable=true.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend (test_security.py::test_login_rate_limited)",
+    "status": "PASSED",
+    "test_id": "TC-FR-001-09"
+  },
+  "TC-FR-001-10": {
+    "actual_result": "NOW VERIFIED (was BLOCKED C1): sessionid rotates on login (old key != new cookie value).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend (test_security.py::test_session_rotates_on_login)",
+    "status": "PASSED",
+    "test_id": "TC-FR-001-10"
+  },
+  "TC-FR-002-01": {
+    "actual_result": "Re-affirmed: role gating green across suites (employee/auditor 403s, admin unrestricted).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-002-01"
+  },
+  "TC-FR-002-02": {
+    "actual_result": "Re-affirmed: scope filtering (maintenance list scoping + C1 asset-list evidence).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-002-02"
+  },
+  "TC-FR-002-03": {
+    "actual_result": "Re-affirmed: out-of-scope attachment download \u2192 404; C1 detail-404 evidence stands.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-002-03"
+  },
+  "TC-FR-002-04": {
+    "actual_result": "Re-affirmed: vertical escalation 403s (assign, maintenance, attachment, import, reference-data).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-002-04"
+  },
+  "TC-FR-002-05": {
+    "actual_result": "Re-affirmed: finance gating \u2014 operator sees no cost/purchase_amount; manager sees money objects (maintenance + export).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-002-05"
+  },
+  "TC-FR-002-06": {
+    "actual_result": "UI capability hiding requires browser (carried).",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-002-06"
+  },
+  "TC-FR-002-07": {
+    "actual_result": "Re-affirmed: dashboard scope field + scoped counts (test_dashboard_summary_counts) + C1 search-scope evidence.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-002-07"
+  },
+  "TC-FR-003-01": {
+    "actual_result": "Re-affirmed: create success with audit+lifecycle (test_assets_api 16 passed).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-003-01"
+  },
+  "TC-FR-003-02": {
+    "actual_result": "Re-affirmed via assets suite (tag uniqueness).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-003-02"
+  },
+  "TC-FR-003-03": {
+    "actual_result": "Re-affirmed via assets suite (per-field validation errors).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-003-03"
+  },
+  "TC-FR-003-04": {
+    "actual_result": "Re-affirmed via assets suite (duplicate pre-check warnings).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-003-04"
+  },
+  "TC-FR-003-05": {
+    "actual_result": "Re-affirmed: create atomic with lifecycle+audit events.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-003-05"
+  },
+  "TC-FR-003-06": {
+    "actual_result": "Idempotent create with key verified (test_idempotent_asset_create).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-003-06"
+  },
+  "TC-FR-004-01": {
+    "actual_result": "Re-affirmed via assets suite + OpenAPI contract tests.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-004-01"
+  },
+  "TC-FR-004-02": {
+    "actual_result": "Re-affirmed via assets suite (version increment on PATCH).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-004-02"
+  },
+  "TC-FR-004-03": {
+    "actual_result": "Re-affirmed via assets suite (409 VERSION_CONFLICT on stale version).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-004-03"
+  },
+  "TC-FR-004-04": {
+    "actual_result": "Re-affirmed via assets + audit suites (before/after snapshots).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-004-04"
+  },
+  "TC-FR-004-05": {
+    "actual_result": "Re-affirmed via assets suite (history endpoint).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-004-05"
+  },
+  "TC-FR-004-06": {
+    "actual_result": "UI 409 prompt requires browser (carried).",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-004-06"
+  },
+  "TC-FR-004-07": {
+    "actual_result": "Form validation UX requires browser (carried).",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-004-07"
+  },
+  "TC-FR-004-08": {
+    "actual_result": "Re-affirmed: server-side validation enforced across suites (no client bypass).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-004-08"
+  },
+  "TC-FR-005-01": {
+    "actual_result": "Exact tag first with match=exact (test_search_exact_tag_first).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-005-01"
+  },
+  "TC-FR-005-02": {
+    "actual_result": "Multi-field global search (serial/model/custodian/location) still not covered in executed suite.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest --collect-only mapping",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-005-02"
+  },
+  "TC-FR-005-03": {
+    "actual_result": "NOW VERIFIED (was BLOCKED C1): combined status_code+category filter AND semantics + ordering + envelope; assigned=true/false boolean filter.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend (test_security.py filter tests)",
+    "status": "PASSED",
+    "test_id": "TC-FR-005-03"
+  },
+  "TC-FR-005-04": {
+    "actual_result": "Server-side ordering -name verified ([Zulu, Alpha]). Bogus-ordering-field sub-check not covered.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-005-04"
+  },
+  "TC-FR-005-05": {
+    "actual_result": "Envelope {count,next,previous,results} verified; C1 default-25/cap-100 evidence stands (not re-verified this cycle).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-005-05"
+  },
+  "TC-FR-005-06": {
+    "actual_result": "URL-state sync requires browser (carried).",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-005-06"
+  },
+  "TC-FR-005-07": {
+    "actual_result": "Search suggestion keyboard UX requires browser (carried).",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-005-07"
+  },
+  "TC-FR-005-08": {
+    "actual_result": "Search perf smoke requires running stack (carried).",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-005-08"
+  },
+  "TC-FR-006-01": {
+    "actual_result": "Saved-view create/list verified; UI apply sub-step requires browser.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend (test_saved_views_crud_and_sharing)",
+    "status": "PASSED",
+    "test_id": "TC-FR-006-01"
+  },
+  "TC-FR-006-02": {
+    "actual_result": "PATCH shared flag + DELETE 204 verified.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-006-02"
+  },
+  "TC-FR-006-03": {
+    "actual_result": "Private view 404 to others; shared read-only (other PATCH \u2192 403).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-006-03"
+  },
+  "TC-FR-006-04": {
+    "actual_result": "Saved-view malformed-config validation still not covered (carried).",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest --collect-only mapping",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-006-04"
+  },
+  "TC-FR-007-01": {
+    "actual_result": "pytest test_assign_closes_previous_and_sets_custodian: assign returns 200, status=assigned, custodian set; suite green (109/109).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend (test_workflows_api.py)",
+    "status": "PASSED",
+    "test_id": "TC-FR-007-01"
+  },
+  "TC-FR-007-02": {
+    "actual_result": "Reassignment atomically closes prior assignment: exactly 1 active + 1 closed Assignment row; BR-002 holds. Atomicity verified at service level.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend (test_workflows_api.py)",
+    "status": "PASSED",
+    "test_id": "TC-FR-007-02"
+  },
+  "TC-FR-007-03": {
+    "actual_result": "Status-based assign rejection still not explicitly covered (disposed-terminal assign \u2192 409 verified C3, which partially covers; under_maintenance/in_transit assign rejection untested).",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend (partial)",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-007-03"
+  },
+  "TC-FR-007-04": {
+    "actual_result": "Auditor assign 403 and cross-scope-operator assign 404 sub-cases still not covered; employee 403 verified C2.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest --collect-only mapping",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-007-04"
+  },
+  "TC-FR-007-05": {
+    "actual_result": "Custodian acknowledgement endpoint still absent from executed deliverables.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest --collect-only mapping",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-007-05"
+  },
+  "TC-FR-008-01": {
+    "actual_result": "Transfer \u2192 in_transit (asset+record), second transfer \u2192 409 TRANSFER_IN_PROGRESS, confirm \u2192 received, location+status applied; custodian-transfer confirm creates single active assignment.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend (test_workflows_api.py)",
+    "status": "PASSED",
+    "test_id": "TC-FR-008-01"
+  },
+  "TC-FR-008-02": {
+    "actual_result": "Transfer missing/invalid destination validation still not covered.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest --collect-only mapping",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-008-02"
+  },
+  "TC-FR-008-03": {
+    "actual_result": "Transfer role/scope matrix still not covered beyond approval-gated paths.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest --collect-only mapping",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-008-03"
+  },
+  "TC-FR-009-01": {
+    "actual_result": "Return closes assignment (status=closed), asset \u2192 available, custodian cleared. Damaged-condition return variant not explicitly tested (core objective verified).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend (test_workflows_api.py::test_return_closes_assignment_and_marks_available)",
+    "status": "PASSED",
+    "test_id": "TC-FR-009-01"
+  },
+  "TC-FR-009-02": {
+    "actual_result": "Return without active assignment \u2192 409 ASSIGNMENT_CONFLICT.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-009-02"
+  },
+  "TC-FR-010-01": {
+    "actual_result": "Reservation create 201; overlapping reservation \u2192 409 RESERVATION_CONFLICT. Adjacent-boundary semantics not explicitly tested.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-010-01"
+  },
+  "TC-FR-010-02": {
+    "actual_result": "Checkout lifecycle verified C2; reservation return + overdue identification now covered by TC-FR-010-04; reservation-return transition sub-case remains untested.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest (partial)",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-010-02"
+  },
+  "TC-FR-010-03": {
+    "actual_result": "GET /reservations scoped (dept-A only; own requests on out-of-scope assets visible), asset+status filters verified.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend (test_reservations_api.py)",
+    "status": "PASSED",
+    "test_id": "TC-FR-010-03"
+  },
+  "TC-FR-010-04": {
+    "actual_result": "overdue=true returns exactly 1 of 3 fixtures (active ended yesterday); future + returned excluded; overdue flag true; unfiltered returns 3. FR-010 complete.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-010-04"
+  },
+  "TC-FR-010-05": {
+    "actual_result": "/reservations page UI requires browser runner (page exists per frontend README + build chunks).",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-010-05"
+  },
+  "TC-FR-010-06": {
+    "actual_result": "Regression: full suite 155/155 green incl. workflows (overlap 409, checkout single-assignment, double-checkout 409); reserve replay via test_idempotency_replay.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-010-06"
+  },
+  "TC-FR-011-01": {
+    "actual_result": "Maintenance create 201; asset \u2192 under_maintenance; record linked.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend (test_maintenance_api.py)",
+    "status": "PASSED",
+    "test_id": "TC-FR-011-01"
+  },
+  "TC-FR-011-02": {
+    "actual_result": "Second open record \u2192 409 MAINTENANCE_ALREADY_OPEN; complete \u2192 asset available, next_maintenance_due=2027-06-01; re-complete \u2192 409 MAINTENANCE_NOT_OPEN. Assign-blocked-during-maintenance sub-check not explicit.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-011-02"
+  },
+  "TC-FR-011-03": {
+    "actual_result": "Operator response omits cost; manager sees/sets money object {amount,currency}. Auditor-read sub-check not covered.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-011-03"
+  },
+  "TC-FR-011-04": {
+    "actual_result": "API list scoping PASSED in C2; UI work-list remains browser-blocked.",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-011-04"
+  },
+  "TC-FR-012-01": {
+    "actual_result": "Warranty windows now covered: dashboard warranty_expiring_30d KPI exact + warranty-expiry report 90-day window exact.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-012-01"
+  },
+  "TC-FR-012-02": {
+    "actual_result": "Not-color-alone indicator check requires browser (badge unit tests green as partial evidence).",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: npm test frontend (partial)",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-012-02"
+  },
+  "TC-FR-013-01": {
+    "actual_result": "lost\u2192status lost, damaged\u2192condition damaged, stolen by custodian employee\u2192status stolen (executed). 'missing' type + evidence-attachment sub-cases not covered.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-013-01"
+  },
+  "TC-FR-013-02": {
+    "actual_result": "Resolve preserves original ExceptionReport (status=resolved, report_type+resolution intact) \u2014 BR-003 verified.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-013-02"
+  },
+  "TC-FR-014-01": {
+    "actual_result": "Retire \u2192 status retired + retirement_date set. Assign-after-retire sub-check covered indirectly by terminal-state test.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend (test_retire_dispose_api.py)",
+    "status": "PASSED",
+    "test_id": "TC-FR-014-01"
+  },
+  "TC-FR-014-02": {
+    "actual_result": "Dispose with open assignment \u2192 409 DISPOSAL_BLOCKED with field_errors.blockers containing open_assignment; success path after no blockers verified. Other blocker classes not individually enumerated (noted).",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-014-02"
+  },
+  "TC-FR-014-03": {
+    "actual_result": "Dispose \u2192 terminal (assign \u2192 409 STATUS_TRANSITION_INVALID), method+date recorded. Proceeds finance-gating sub-check not covered (noted).",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-014-03"
+  },
+  "TC-FR-014-04": {
+    "actual_result": "Force override: operator force:true \u2192 409; asset_manager force:true with reason \u2192 disposed (write_off, date set). BR-006 exception gated by role.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-014-04"
+  },
+  "TC-FR-014-05": {
+    "actual_result": "Reopen: operator \u2192 403; blank justification \u2192 400; admin reopen \u2192 retired with disposal_date preserved (BR-003) + 'reopened' lifecycle event; non-disposed reopen \u2192 409.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-014-05"
+  },
+  "TC-FR-014-06": {
+    "actual_result": "Disposed asset found via assets?status_code=disposed by manager.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-014-06"
+  },
+  "TC-FR-014-07": {
+    "actual_result": "Approval-gated disposal: 202 pending (asset untouched) \u2192 approve executes; reject leaves unchanged; APPROVALS_ENABLED=false bypass documented + tested.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend (test_approvals_api.py)",
+    "status": "PASSED",
+    "test_id": "TC-FR-014-07"
+  },
+  "TC-FR-015-01": {
+    "actual_result": "Upload 201 (filename/size metadata), list, download bytes exact, delete 204; audit events attachment.upload/download/remove all present. Path-traversal filename variant not explicitly tested.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend (test_attachments_notes_api.py)",
+    "status": "PASSED",
+    "test_id": "TC-FR-015-01"
+  },
+  "TC-FR-015-02": {
+    "actual_result": ".exe \u2192 415; fake PNG signature \u2192 415; empty file \u2192 400. Oversize 413 sub-case not covered.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-015-02"
+  },
+  "TC-FR-015-03": {
+    "actual_result": "Cross-scope download \u2192 404 (no existence leak); employee upload \u2192 403. Unauthenticated 401 covered by auth suite. Direct-URL check N/A in this environment.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-015-03"
+  },
+  "TC-FR-015-04": {
+    "actual_result": "API delete/audit PASSED C2; documents-tab UI remains browser-blocked.",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-015-04"
+  },
+  "TC-FR-016-01": {
+    "actual_result": "Note create 201 with author; blank body \u2192 400 field_errors.body; list returns note. Markup-escaping render check requires browser.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-016-01"
+  },
+  "TC-FR-016-02": {
+    "actual_result": "Notes append-only mutation probes still not covered.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest --collect-only mapping",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-016-02"
+  },
+  "TC-FR-017-01": {
+    "actual_result": "GET label \u2192 tag, url ends /scan?tag=ATT-007, svg payload present, label 50x25mm. Unauthorized-access sub-check not covered.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend (test_label_returns_qr_svg_and_deep_link)",
+    "status": "PASSED",
+    "test_id": "TC-FR-017-01"
+  },
+  "TC-FR-017-02": {
+    "actual_result": "Label print inspection requires browser.",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-017-02"
+  },
+  "TC-FR-017-03": {
+    "actual_result": "Scan resolution E2E requires browser (parseScannedTag unit tests green).",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: npm test frontend (partial)",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-017-03"
+  },
+  "TC-FR-017-04": {
+    "actual_result": "Unknown-code UI handling requires browser (parser rejection unit tests green).",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: npm test frontend (partial)",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-017-04"
+  },
+  "TC-FR-018-01": {
+    "actual_result": "Template endpoint 200; columns include tag + category_code (JSON columns contract, documented).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend (test_bulk_api.py)",
+    "status": "PASSED",
+    "test_id": "TC-FR-018-01"
+  },
+  "TC-FR-018-02": {
+    "actual_result": "Upload \u2192 status validated, total_rows; invalid rows reported with row messages (category_code, 'name is required'); missing required columns \u2192 400 IMPORT_ROW_INVALID; no writes pre-commit.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-018-02"
+  },
+  "TC-FR-018-03": {
+    "actual_result": "Duplicate policies verified: skip (unchanged), update (name changed, count=1), reject (failed_count=1, unchanged).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-018-03"
+  },
+  "TC-FR-018-04": {
+    "actual_result": "Commit \u2192 completed, created_count accurate, result rows carry per-row status; asset exists post-commit.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-018-04"
+  },
+  "TC-FR-018-05": {
+    "actual_result": "Import: =HYPERLINK sanitized (stored as '=HYPERLINK(1), flagged 'sanitized'). Export: ' prefix on dangerous leading chars (csv_utils + export test '=EVIL()). UTF-8 BOM decode verified.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend (test_bulk_api.py, test_csv_utils.py)",
+    "status": "PASSED",
+    "test_id": "TC-FR-018-05"
+  },
+  "TC-FR-018-06": {
+    "actual_result": "Re-commit of same job returns created_count=1 with no duplicate asset (safely repeatable).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-018-06"
+  },
+  "TC-FR-018-07": {
+    "actual_result": "Unicode import round-trip still not covered in executed suite.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest --collect-only mapping",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-018-07"
+  },
+  "TC-FR-018-08": {
+    "actual_result": "J-7 wizard E2E requires browser.",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-018-08"
+  },
+  "TC-FR-019-01": {
+    "actual_result": "Export includes purchase_amount for asset_manager, excludes it for operator; content correct. Row-level scope intersection sub-check partial.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-019-01"
+  },
+  "TC-FR-019-02": {
+    "actual_result": "Export job completes (eager mode), download streams CSV; other user's download \u2192 404. Async queued\u2192processing transitions not observable in eager mode (documented D-10).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-019-02"
+  },
+  "TC-FR-020-01": {
+    "actual_result": "Dashboard summary: total_assets=2, scope=global, unassigned=2, by_status rows, generated_at present.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-020-01"
+  },
+  "TC-FR-020-02": {
+    "actual_result": "Dashboard UI states require browser (carried).",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-020-02"
+  },
+  "TC-FR-020-03": {
+    "actual_result": "Per-role dashboard UI requires browser (carried).",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-020-03"
+  },
+  "TC-FR-020-04": {
+    "actual_result": "NOW VERIFIED (C2 finding closed): full KPI set \u2014 total 5, assigned 1, unassigned 4, overdue_returns 1, under_maintenance 1, warranty_expiring_30d 1, maintenance_due 1, missing_lost_stolen 1, open_exceptions 1, by_status/by_category, recent_activity, scope restricted/global non-misleading.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-020-04"
+  },
+  "TC-FR-020-05": {
+    "actual_result": "Recent-activity panel data assertions require dedicated test/browser; recent_activity presence verified in KPI test (partial).",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend (partial)",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-020-05"
+  },
+  "TC-FR-020-06": {
+    "actual_result": "Charts/tasks a11y fallback requires browser (carried).",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-020-06"
+  },
+  "TC-FR-020-07": {
+    "actual_result": "API-side dashboard completion verified via the full-KPI test (see TC-FR-020-04). UI drill-through/links and refreshed timestamp render remain browser-blocked (noted).",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-020-07"
+  },
+  "TC-FR-021-01": {
+    "actual_result": "Catalog == exactly the 14 spec report types; operator \u2192 403 on catalog + detail.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend (test_reports_api.py)",
+    "status": "PASSED",
+    "test_id": "TC-FR-021-01"
+  },
+  "TC-FR-021-02": {
+    "actual_result": "assets-by-status totals reconcile per scope (deptmgr 2 vs manager 3, sum(rows)==total). 4-report breadth not fully covered (assets-by-status + warranty + asset-register verified).",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-021-02"
+  },
+  "TC-FR-021-03": {
+    "actual_result": "Invalid date \u2192 400 field_errors.date_from; warranty default 90-day window exact (REP-010 in, REP-011 out). from>to sub-case not covered (noted).",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-021-03"
+  },
+  "TC-FR-021-04": {
+    "actual_result": "CSV export sanitized ('=dangerous prefixed), audited (report.export), auditor can run reports; unknown type \u2192 404.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-021-04"
+  },
+  "TC-FR-021-05": {
+    "actual_result": "warranty-expiry report default window returns exactly the \u226490d asset.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-021-05"
+  },
+  "TC-FR-021-06": {
+    "actual_result": "Reports viewer E2E requires browser runner.",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-021-06"
+  },
+  "TC-FR-022-01": {
+    "actual_result": "Session create 201 (draft), start \u2192 open with snapshot_at, restart \u2192 409 STOCKTAKE_STATE_INVALID; operator create \u2192 403.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend (test_stocktakes_api.py)",
+    "status": "PASSED",
+    "test_id": "TC-FR-022-01"
+  },
+  "TC-FR-022-02": {
+    "actual_result": "Outcomes verified: found, duplicate, unexpected (unknown tag), moved, condition_mismatch; not-found via variance; observation idempotent via Idempotency-Key (replay same uuid, single row).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-022-02"
+  },
+  "TC-FR-022-03": {
+    "actual_result": "Create requires manager (operator 403); observation requires operator (employee 403). Auditor read-only sub-check not covered.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-022-03"
+  },
+  "TC-FR-022-04": {
+    "actual_result": "Variance exact (expected 4, found 3, not_found/duplicates/unexpected lists); close before reconcile \u2192 409; reconcile applies moved location + condition; close \u2192 closed; post-close observation \u2192 409. Close-role-gating sub-check not explicit.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-022-04"
+  },
+  "TC-FR-022-05": {
+    "actual_result": "Mobile count + offline UX requires Playwright emulation.",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-022-05"
+  },
+  "TC-FR-023-01": {
+    "actual_result": "assignment.created \u2192 custodian (link to /assets/, unread); approval.requested \u2192 manager; exception.reported \u2192 managers; unrelated user sees nothing.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend (test_notifications_api.py)",
+    "status": "PASSED",
+    "test_id": "TC-FR-023-01"
+  },
+  "TC-FR-023-02": {
+    "actual_result": "Due-reminder dedupe: first run creates 1+1, second same-day run creates 0 (per-asset-per-day dedupe key).",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-023-02"
+  },
+  "TC-FR-023-03": {
+    "actual_result": "Mark-read sets read_at, idempotent on repeat; other user read attempt \u2192 404; unread filter empties after read.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-023-03"
+  },
+  "TC-FR-023-04": {
+    "actual_result": "Mandatory type (approval.decided) mute \u2192 400; optional (assignment.created) mute \u2192 200 and notification suppressed on next event; unknown types \u2192 400.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-023-04"
+  },
+  "TC-FR-023-05": {
+    "actual_result": "SMTP dispatch + failure-logging not covered by executed tests; no SMTP stub in QA environment. README documents email-when-configured with content-free failure logs.",
+    "cycle_last_executed": 3,
+    "evidence_path": "inspection: backend README C3 section",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-023-05"
+  },
+  "TC-FR-023-06": {
+    "actual_result": "Deep-link click-through UX requires browser. API-side isolation verified (own-only lists, cross-user 404).",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend (partial)",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-023-06"
+  },
+  "TC-FR-023-07": {
+    "actual_result": "Notification center E2E requires browser runner.",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-023-07"
+  },
+  "TC-FR-024-01": {
+    "actual_result": "Approval-gated transfer: 202 with approval ref, no TransferRecord pre-decision; after approve \u2192 in_transit. Disposal held identically (asset untouched, pending request, approvers notified).",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend (test_approvals_api.py)",
+    "status": "PASSED",
+    "test_id": "TC-FR-024-01"
+  },
+  "TC-FR-024-02": {
+    "actual_result": "Approve records status/comments and executes held disposal (asset disposed); requester gets approval.decided notification.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-024-02"
+  },
+  "TC-FR-024-03": {
+    "actual_result": "Reject with comments leaves asset in_stock; decision recorded. Return-for-changes endpoint exists per design/README but not explicitly covered by executed tests (noted).",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-024-03"
+  },
+  "TC-FR-024-04": {
+    "actual_result": "SoD: manager self-approval \u2192 409 SEPARATION_OF_DUTIES; independent manager approves; operator (non-approver) \u2192 403.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-024-04"
+  },
+  "TC-FR-024-05": {
+    "actual_result": "Re-decision \u2192 409 APPROVAL_ALREADY_DECIDED; decisions immutable. PATCH/DELETE probes not explicitly covered (noted).",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-024-05"
+  },
+  "TC-FR-024-06": {
+    "actual_result": "Inbox scoping: requester sees own pending request; manager inbox contains it. Cross-scope 404 sub-check inherits ADR-007 convention (not explicitly re-tested).",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-024-06"
+  },
+  "TC-FR-024-07": {
+    "actual_result": "Approvals inbox E2E requires browser runner.",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-024-07"
+  },
+  "TC-FR-025-01": {
+    "actual_result": "Re-affirmed via audit suites (auth + asset mutation completeness).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-025-01"
+  },
+  "TC-FR-025-02": {
+    "actual_result": "Re-affirmed: hash chain tests green (test_audit_chain 2).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-025-02"
+  },
+  "TC-FR-025-03": {
+    "actual_result": "Re-affirmed: no audit mutation surface (OpenAPI contract green).",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-025-03"
+  },
+  "TC-FR-025-04": {
+    "actual_result": "Re-affirmed: correlation ID propagation into audit events.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-025-04"
+  },
+  "TC-FR-025-05": {
+    "actual_result": "Audit-events API: auditor queries by action + target_uuid (exact results), employee \u2192 403.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-025-05"
+  },
+  "TC-FR-026-01": {
+    "actual_result": "Reference-data admin UI requires browser runner (page exists per frontend README/build).",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-026-01"
+  },
+  "TC-FR-027-01": {
+    "actual_result": "Admin lists users; operator \u2192 403 on list and PATCH; password/username writes \u2192 400 (secrets never settable/exposed).",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend (test_admin_api.py)",
+    "status": "PASSED",
+    "test_id": "TC-FR-027-01"
+  },
+  "TC-FR-027-02": {
+    "actual_result": "Role+scope PATCH returns updated user and writes admin.user.update audit event. Immediate-effect asset-create sub-check not explicit (noted).",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-027-02"
+  },
+  "TC-FR-027-03": {
+    "actual_result": "Regular-user deactivation with session-revocation check not covered in executed suite (only LAST_ADMIN deactivation guard is).",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest --collect-only mapping",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-027-03"
+  },
+  "TC-FR-027-04": {
+    "actual_result": "Sole admin demote AND deactivate \u2192 409 LAST_ADMIN; with second admin present, change allowed.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-FR-027-04"
+  },
+  "TC-FR-028-01": {
+    "actual_result": "NOW VERIFIED (C2 finding closed): queue flags missing_serial (warning), missing_condition, possible_duplicate_serial (error), status_assignment_mismatch, expired_assignment, warranty_expired; errors sort before warnings; totals consistent; queue scoped.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend (test_dataquality_dashboard.py)",
+    "status": "PASSED",
+    "test_id": "TC-FR-028-01"
+  },
+  "TC-FR-028-02": {
+    "actual_result": "Queue flagging verified, but the resolve flow (POST /data-quality/issues/:uuid/resolve or fix-and-clear) has no executed test coverage.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest --collect-only mapping",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-028-02"
+  },
+  "TC-FR-029-01": {
+    "actual_result": "Activity feed combines note+lifecycle+audit event types with summaries after note + department assignment. UI history tab requires browser.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend (test_activity_feed_combines_event_types)",
+    "status": "PASSED",
+    "test_id": "TC-FR-029-01"
+  },
+  "TC-FR-029-02": {
+    "actual_result": "Feed permission-redaction still not covered in executed suite.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest --collect-only mapping",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-029-02"
+  },
+  "TC-FR-030-01": {
+    "actual_result": "Archive round-trip (record_status + history preservation + default-list exclusion) not covered in executed suite. Partial: legal_hold admin-only PATCH verified (operator 403, admin 200).",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend (test_retention_volume.py, partial)",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-030-01"
+  },
+  "TC-FR-030-02": {
+    "actual_result": "Retention-rule evaluation/purge dry-run not covered; ARCHIVE_RETENTION_DAYS config + legal_hold documented.",
+    "cycle_last_executed": 3,
+    "evidence_path": "inspection: backend README + BACKUP_RESTORE.md",
+    "status": "BLOCKED",
+    "test_id": "TC-FR-030-02"
+  },
+  "TC-HARD-001": {
+    "actual_result": "All three \u00a72.5-mandated coverage classes landed and pass: test_dataquality_dashboard (5: DQ flags \u00d72, scoping, full KPI set, scope totals), test_idempotency_replay (3: transfer/return/reserve exactly-once).",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend + collect-only",
+    "status": "PASSED",
+    "test_id": "TC-HARD-001"
+  },
+  "TC-HARD-002": {
+    "actual_result": "Browser runner still unavailable (final status). Manual-verification path: E2E specs exist in frontend/tests/e2e (per README 'npm run test:e2e requires compose stack'); backend API evidence covers the logic. Cases stay BLOCKED/MANUAL, not silently passed.",
+    "cycle_last_executed": 3,
+    "evidence_path": "environment probe (no playwright command available)",
+    "status": "BLOCKED",
+    "test_id": "TC-HARD-002"
+  },
+  "TC-LAY-001": {
+    "actual_result": "App-shell navigation requires browser (final attempt \u2014 environment unchanged).",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-LAY-001"
+  },
+  "TC-LAY-002": {
+    "actual_result": "Skeleton/empty states require browser; unit tests for EmptyState/InlineAlert/LoadingSkeleton green as partial evidence.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: npm test frontend (partial)",
+    "status": "BLOCKED",
+    "test_id": "TC-LAY-002"
+  },
+  "TC-NFR-002-01": {
+    "actual_result": "Responsive matrix requires Playwright (final attempt \u2014 environment unchanged).",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-NFR-002-01"
+  },
+  "TC-NFR-002-02": {
+    "actual_result": "Table/card switch requires browser (final attempt \u2014 environment unchanged).",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-NFR-002-02"
+  },
+  "TC-NFR-003-01": {
+    "actual_result": "axe scans require browser runner (final attempt \u2014 environment unchanged).",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-NFR-003-01"
+  },
+  "TC-NFR-003-02": {
+    "actual_result": "Keyboard pass requires browser (final attempt \u2014 environment unchanged).",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-NFR-003-02"
+  },
+  "TC-NFR-003-03": {
+    "actual_result": "Contrast sampling requires browser (final attempt \u2014 environment unchanged).",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-NFR-003-03"
+  },
+  "TC-NFR-003-04": {
+    "actual_result": "SSR HTML inspection requires running frontend (final attempt \u2014 environment unchanged).",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-NFR-003-04"
+  },
+  "TC-NFR-003-05": {
+    "actual_result": "Error-page checks require browser (final attempt \u2014 environment unchanged).",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-NFR-003-05"
+  },
+  "TC-NFR-004-01": {
+    "actual_result": "Latency measurement requires running HTTP stack; N+1 query discipline verified instead (\u22645 queries on assets list with volume).",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend (partial)",
+    "status": "BLOCKED",
+    "test_id": "TC-NFR-004-01"
+  },
+  "TC-NFR-006-01": {
+    "actual_result": "Partial: generate_volume verified (120+10 unique VOL- assets, idempotent) and list endpoint bounded to \u22645 queries with volume present. Full ~100k planning-volume latency run requires a suitable environment \u2014 remains blocked; procedure documented.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend (test_retention_volume.py)",
+    "status": "BLOCKED",
+    "test_id": "TC-NFR-006-01"
+  },
+  "TC-NFR-007-01": {
+    "actual_result": "NOW VERIFIED (was BLOCKED C1): backend responses carry X-Content-Type-Options=nosniff, Referrer-Policy=same-origin, CSP present, X-Frame-Options=DENY. Frontend HTML header verification requires running server.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend (test_security.py::test_security_headers_present)",
+    "status": "PASSED",
+    "test_id": "TC-NFR-007-01"
+  },
+  "TC-NFR-007-02": {
+    "actual_result": "Stored-XSS render probes require browser (carried).",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-NFR-007-02"
+  },
+  "TC-NFR-007-03": {
+    "actual_result": "SQLi probes require live HTTP stack (carried).",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-NFR-007-03"
+  },
+  "TC-NFR-007-04": {
+    "actual_result": "Cookie flag attributes not asserted in executed tests (carried).",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-NFR-007-04"
+  },
+  "TC-NFR-007-05": {
+    "actual_result": "Log masking/browser storage inspection requires stack + browser (carried).",
+    "cycle_last_executed": 3,
+    "evidence_path": "n/a",
+    "status": "BLOCKED",
+    "test_id": "TC-NFR-007-05"
+  },
+  "TC-NFR-007-06": {
+    "actual_result": "NOW VERIFIED (was BLOCKED C1): hostile Origin not reflected (no Access-Control-Allow-Origin). Preflight/credentials-combination sub-checks not covered.",
+    "cycle_last_executed": 2,
+    "evidence_path": "tool-output: pytest backend (test_security.py::test_cors_origin_not_reflected_for_unlisted_origin)",
+    "status": "PASSED",
+    "test_id": "TC-NFR-007-06"
+  },
+  "TC-NFR-007-07": {
+    "actual_result": "Production fail-fast verified by inspection in C1 (D-13); not re-executed (carried).",
+    "cycle_last_executed": 3,
+    "evidence_path": "cycle-1 inspection evidence",
+    "status": "MANUAL",
+    "test_id": "TC-NFR-007-07"
+  },
+  "TC-NFR-007-08": {
+    "actual_result": "C3 endpoint sweep: every new endpoint class has executed role/scope denial evidence (reports operator 403, admin endpoints 403, notifications own-only 404, approvals 403/SoD, LAST_ADMIN guard, legal_hold 403); auth/CSRF middleware stack is the same one verified in C2 (CSRF reject, 401 envelopes).",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pytest backend (all C3 test files)",
+    "status": "PASSED",
+    "test_id": "TC-NFR-007-08"
+  },
+  "TC-NFR-012-01": {
+    "actual_result": "Documentation + tooling verified by inspection: BACKUP_RESTORE.md complete (scope, schedule, encryption, drill checklist incl. audit verify_chain(), RTO\u22648h/RPO\u226424h), backup.sh (gzipped pg_dump), restore.sh (production guard, ON_ERROR_STOP). The drill itself requires Docker \u2192 MANUAL with documented procedure.",
+    "cycle_last_executed": 3,
+    "evidence_path": "inspection: backend/docs/BACKUP_RESTORE.md, scripts/backup.sh, scripts/restore.sh",
+    "status": "MANUAL",
+    "test_id": "TC-NFR-012-01"
+  },
+  "TC-REL-001": {
+    "actual_result": "Gates all green (backend 155 + ruff + mypy; frontend 88 + lint + typecheck + build), OpenAPI drift guard passing with C3 endpoints, docs current \u2014 but the defect register contains one undispositioned High (DEF-104/DEF-005), violating \u00a717 'no unresolved critical/high without recorded risk decision'.",
+    "cycle_last_executed": 3,
+    "defect_id": "DEF-104",
+    "evidence_path": "tool-output: all gates; inspection: READMEs, defects register",
+    "status": "FAILED",
+    "test_id": "TC-REL-001"
+  },
+  "TC-STK-001": {
+    "actual_result": "UPGRADED from FAILED: ADR-006 auto-copy in dev-up.sh makes the documented clean-checkout bootstrap work (script logic verified: copies compose.yaml + .env.example + .env when absent, banners, pipefail). Full Docker boot remains unverified in this environment (noted).",
+    "cycle_last_executed": 3,
+    "evidence_path": "inspection: scripts/dev-up.sh",
+    "status": "PASSED",
+    "test_id": "TC-STK-001"
+  },
+  "TC-STK-002": {
+    "actual_result": "Script idempotency/teardown requires Docker (carried). dev-up.sh re-run non-clobber verified by inspection (partial).",
+    "cycle_last_executed": 3,
+    "evidence_path": "inspection: scripts/dev-up.sh (partial)",
+    "status": "BLOCKED",
+    "test_id": "TC-STK-002"
+  },
+  "TC-STK-003": {
+    "actual_result": "Backend gates green: ruff format 147 files, ruff check clean, mypy 145 files, pytest 155/155, migration/seed tests green.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: ruff/mypy/pytest backend",
+    "status": "PASSED",
+    "test_id": "TC-STK-003"
+  },
+  "TC-STK-004": {
+    "actual_result": "Frontend gates green: eslint, nuxi typecheck (known non-fatal volar stderr warning), vitest 88/88, build 3.07 MB / 786 kB gzip.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: npm lint/typecheck/test/build frontend",
+    "status": "PASSED",
+    "test_id": "TC-STK-004"
+  },
+  "TC-STK-005": {
+    "actual_result": "Hygiene mostly verified (.env ignored, package-lock committed, placeholder-only env example, canonical bootstrap files present, no secrets in inspected files) but the security half of the register is incomplete: DEF-005 has no disposition (DEF-104) and uv.lock remains absent (ADR-003 documented).",
+    "cycle_last_executed": 3,
+    "defect_id": "DEF-104",
+    "evidence_path": "inspection: .gitignore, lockfiles, READMEs",
+    "status": "FAILED",
+    "test_id": "TC-STK-005"
+  },
+  "TC-STK-006": {
+    "actual_result": "Versions verified: Django 6.0.7 (ADR-005), DRF 3.17.1, celery 5.6.3, postgres:18/redis:7 in canonical compose, Nuxt 4 build OK; deviations documented.",
+    "cycle_last_executed": 3,
+    "evidence_path": "tool-output: pip freeze (C2) + C3 builds + READMEs",
+    "status": "PASSED",
+    "test_id": "TC-STK-006"
+  }
+}

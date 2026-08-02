@@ -1,0 +1,107 @@
+[
+  {
+    "test_id": "TC-VER-001",
+    "requirement_ids": ["STK-1", "STK-5"],
+    "title": "DEF-001 verify: compose.yaml exists and defines the required services",
+    "objective": "Verify root compose.yaml now exists and defines backend, frontend, postgres, redis (celery-worker/beat + minio optional) per design §16.1; scripts can reference it.",
+    "priority": "Critical",
+    "type": "Build/Verification",
+    "preconditions": "Cycle-2 backend deliverables applied.",
+    "test_data": "compose.yaml content",
+    "steps": [
+      "Read compose.yaml; verify presence and service definitions (frontend, backend, postgres, redis; celery/minio per plan).",
+      "Verify healthchecks/dependency ordering for backend readiness and non-root containers per design §16.2.",
+      "Boot verification (docker compose up) remains Docker-dependent — execute if a Docker environment is available; otherwise record BLOCKED for the boot portion."
+    ],
+    "expected_result": "compose.yaml present with all required services wired (env via .env, healthchecks, volumes for postgres/media); closes DEF-001 pending boot test.",
+    "status": "NOT_RUN",
+    "automation_status": "file-inspection automatable; boot blocked without Docker"
+  },
+  {
+    "test_id": "TC-VER-002",
+    "requirement_ids": ["STK-1", "STK-5"],
+    "title": "DEF-002 verify: root .env.example present with placeholder-only values",
+    "objective": "Verify root .env.example exists, documents every required variable, and contains no real secrets.",
+    "priority": "High",
+    "type": "Security/RepoHygiene",
+    "preconditions": "Cycle-2 deliverables applied.",
+    "test_data": ".env.example content",
+    "steps": [
+      "Read .env.example; verify all variables referenced by compose.yaml and settings are present with placeholders.",
+      "Scan for secret-looking real values (none allowed).",
+      "Verify .gitignore still excludes .env."
+    ],
+    "expected_result": "Complete placeholder-only env example present; closes DEF-002.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (file inspection)"
+  },
+  {
+    "test_id": "TC-VER-003",
+    "requirement_ids": ["FR-003", "D-08"],
+    "title": "DEF-003 verify: Idempotency-Key works on asset create (re-run of TC-FR-003-06)",
+    "objective": "Verify POST /assets honors Idempotency-Key: replay returns original response without duplicates; conflicting payload with same key rejected.",
+    "priority": "Critical",
+    "type": "API/Integration",
+    "preconditions": "Cycle-2 idempotency implementation delivered; operator session.",
+    "test_data": "valid payload + Idempotency-Key qa-ver-0001",
+    "steps": [
+      "POST /assets with key; record response (uuid/tag).",
+      "Repeat identical request; compare response and asset count.",
+      "Repeat with same key + different payload; expect rejection per contract.",
+      "Verify IdempotencyRecord scoping (per user+endpoint) and 24h TTL presence in implementation/tests."
+    ],
+    "expected_result": "Replay-safe create; conflict detection on key reuse with different payload; closes DEF-003 for asset create (workflow endpoints covered in their own suites).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-VER-004",
+    "requirement_ids": ["STK-5"],
+    "title": "DEF-004 verify: backend uv.lock committed and consistent with pyproject",
+    "objective": "Verify backend/uv.lock (or documented equivalent pin file) exists and matches pyproject dependencies.",
+    "priority": "Medium",
+    "type": "Build/Verification",
+    "preconditions": "Cycle-2 deliverables applied (ADR-003 target).",
+    "test_data": "uv.lock presence; spot-check key packages (django, djangorestframework, psycopg)",
+    "steps": [
+      "Check for backend/uv.lock; if an alternative (requirements lock) is delivered instead, verify README documents it per ADR policy.",
+      "Spot-check locked versions satisfy pyproject ranges."
+    ],
+    "expected_result": "Committed lockfile or documented equivalent; closes DEF-004 when present; remains open (Low) if still absent with documented reason.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (file inspection)"
+  },
+  {
+    "test_id": "TC-VER-005",
+    "requirement_ids": ["STK-4"],
+    "title": "DEF-005 verify: frontend lint is warning-free",
+    "objective": "Verify npm lint now reports 0 errors AND 0 warnings (13 self-closing warnings fixed).",
+    "priority": "Low",
+    "type": "Build/QualityGate",
+    "preconditions": "Cycle-2 frontend deliverables applied.",
+    "test_data": "npm run lint output",
+    "steps": ["Run lint via allowlisted command.", "Confirm zero warnings."],
+    "expected_result": "Clean lint; closes DEF-005.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-VER-006",
+    "requirement_ids": ["FR-026", "BR-004"],
+    "title": "DEF-006 verify: reference-data DELETE deactivates (or is blocked) for in-use values",
+    "objective": "Verify reference-data delete semantics: deleting an in-use value is blocked (409 with message) or performs deactivation, never hard delete of referenced records; unused values behave per documented contract; action audited.",
+    "priority": "High",
+    "type": "API/Functional+Security",
+    "preconditions": "admin session; a department referenced by an existing asset; an unused reference record.",
+    "test_data": "DELETE on in-use department; DELETE on unused record",
+    "steps": [
+      "DELETE in-use department → expect 409 (or documented deactivation response); verify record still referenced and asset intact.",
+      "DELETE unused record → verify documented behavior (deactivate vs delete).",
+      "Verify audit event records the action.",
+      "Verify deactivated values no longer selectable in create/edit flows but remain on historical records."
+    ],
+    "expected_result": "BR-004 enforced: no hard delete of in-use reference data; deactivate-not-delete semantics; audited; historical references intact. Closes DEF-006.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  }
+]

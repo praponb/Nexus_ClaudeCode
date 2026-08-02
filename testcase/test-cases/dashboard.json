@@ -1,0 +1,106 @@
+[
+  {
+    "test_id": "TC-FR-020-01",
+    "requirement_ids": ["FR-020"],
+    "title": "Dashboard summary returns scoped aggregates",
+    "objective": "Verify GET /dashboard/summary returns total, by-status, by-category, assigned/unassigned counts consistent with the permitted record set. (Cycle-1: PASSED for global scope.)",
+    "priority": "High",
+    "type": "API/Functional",
+    "preconditions": "seeded data; admin and deptmgr sessions.",
+    "test_data": "none",
+    "steps": [
+      "GET /api/v1/dashboard/summary as admin.",
+      "Independently compute expected counts via filtered /assets queries.",
+      "GET /api/v1/dashboard/summary as deptmgr; compare against scoped counts."
+    ],
+    "expected_result": "Totals reconcile exactly with list-based counts; scoped user totals reflect only permitted records; generated_at present; shape matches contract.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-020-02",
+    "requirement_ids": ["FR-020"],
+    "title": "Dashboard UI — KPI cards, loading/empty/error states, drill-through",
+    "objective": "Verify dashboard renders KPI cards from summary data, shows skeletons while loading, an error state with correlation ID on failure, and KPIs link to filtered asset lists.",
+    "priority": "High",
+    "type": "UI/Functional",
+    "preconditions": "browser + running stack (BLOCKED if unavailable).",
+    "test_data": "seeded data; simulated API failure",
+    "steps": [
+      "Load / and observe skeletons then KPI cards.",
+      "Click a KPI indicator — verify navigation to filtered /assets.",
+      "Block /dashboard/summary; observe error state."
+    ],
+    "expected_result": "Skeletons during load; KPI values match API; drill-through filters consistent; error state user-safe with correlation ID + retry; last-refreshed shown.",
+    "status": "NOT_RUN",
+    "automation_status": "blocked without browser runner"
+  },
+  {
+    "test_id": "TC-FR-020-03",
+    "requirement_ids": ["FR-020"],
+    "title": "Dashboard renders for every role without errors",
+    "objective": "Smoke-verify dashboard loads with role-appropriate KPIs for all six roles.",
+    "priority": "Medium",
+    "type": "UI/Smoke",
+    "preconditions": "browser + running stack (BLOCKED if unavailable).",
+    "test_data": "all six seed users",
+    "steps": ["Sign in as each role; load /; capture console errors and visible KPIs."],
+    "expected_result": "Dashboard loads for every role, no console errors, scope-appropriate indicators only.",
+    "status": "NOT_RUN",
+    "automation_status": "blocked without browser runner"
+  },
+  {
+    "test_id": "TC-FR-020-04",
+    "requirement_ids": ["FR-020"],
+    "title": "Cycle-2 KPIs — overdue returns, maintenance due, warranty expiring, missing",
+    "objective": "Verify the completed dashboard summary includes overdue-return, maintenance-due, warranty-expiring, and missing-asset aggregates that reconcile with filtered queries.",
+    "priority": "High",
+    "type": "API/Functional",
+    "preconditions": "fixtures: assignment with expected_return_at in past; asset with next_maintenance_due in window; asset with warranty_end in window; asset with lost/missing status.",
+    "test_data": "GET /dashboard/summary + equivalent filtered list queries",
+    "steps": [
+      "Create/seed each condition fixture.",
+      "GET dashboard summary; record each new KPI value.",
+      "Independently compute each count via filtered queries; compare.",
+      "Verify scope: dept-scoped user sees only in-scope figures."
+    ],
+    "expected_result": "Each Cycle-2 KPI present and exactly reconciles with independent filtered counts; scope respected; no double counting.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-020-05",
+    "requirement_ids": ["FR-020"],
+    "title": "Recent-activity panel reflects latest permitted events",
+    "objective": "Verify dashboard recent-activity data shows the user's most recent permitted lifecycle/audit events in reverse chronological order.",
+    "priority": "Medium",
+    "type": "API/Functional",
+    "preconditions": "known sequence of recent mutations across two departments.",
+    "test_data": "dashboard summary/activity payload",
+    "steps": [
+      "Perform ordered mutations in dept A and dept B.",
+      "As admin: verify recent activity ordering and content.",
+      "As dept-A-scoped user: verify only dept-A events appear."
+    ],
+    "expected_result": "Recent activity newest-first and scope-filtered; entries carry type/actor/timestamp/summary; no cross-scope leakage.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-020-06",
+    "requirement_ids": ["FR-020", "D-15"],
+    "title": "Dashboard charts/tasks panels — accessible with table fallback",
+    "objective": "Verify Cycle-2 dashboard additions (tasks panel, charts or ranked bar lists) render with text summaries and data-table alternatives per D-15.",
+    "priority": "Medium",
+    "type": "UI/Accessibility",
+    "preconditions": "browser + running stack (BLOCKED if unavailable).",
+    "test_data": "dashboard with populated KPIs",
+    "steps": [
+      "Open /; verify tasks panel (my assignments/overdue items) if delivered.",
+      "Verify each chart has a text summary and an accessible data-table alternative; axe-clean."
+    ],
+    "expected_result": "Tasks panel actionable and scope-correct; every visualization has summary + table fallback; keyboard/screen-reader usable.",
+    "status": "NOT_RUN",
+    "automation_status": "blocked without browser runner"
+  }
+]

@@ -1,0 +1,149 @@
+[
+  {
+    "test_id": "TC-STK-001",
+    "requirement_ids": ["STK-1", "STK-5"],
+    "title": "Clean-environment bootstrap via documented scripts",
+    "objective": "Verify ./scripts/dev-up.sh && migrate.sh && seed-dev.sh yield a working app (frontend :3000, backend :8000) from a clean checkout per the cycle DoD.",
+    "priority": "Critical",
+    "type": "Build/Install",
+    "preconditions": "clean workspace; Docker available; .env created from .env.example per README.",
+    "test_data": "none",
+    "steps": [
+      "Copy .env.example to .env; run scripts/dev-up.sh.",
+      "Run scripts/migrate.sh; run scripts/seed-dev.sh.",
+      "Verify backend /api/v1/health/ready 200 and frontend / 200.",
+      "Verify README instructions match actual required steps."
+    ],
+    "expected_result": "All scripts exit 0 with clear env banners; app reachable and login possible with seeded users; README accurate; scripts idempotent (re-running seed does not duplicate or fail).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (allowlisted commands where available; else documented manual run)"
+  },
+  {
+    "test_id": "TC-STK-002",
+    "requirement_ids": ["STK-1", "STK-5"],
+    "title": "Script re-runnability and teardown",
+    "objective": "Verify scripts are idempotent and dev-down.sh cleanly stops the stack without orphan volumes/containers (unless documented).",
+    "priority": "Medium",
+    "type": "Build/Install",
+    "preconditions": "running stack from TC-STK-001.",
+    "test_data": "none",
+    "steps": [
+      "Re-run migrate.sh and seed-dev.sh; verify exit 0 and no duplicate seed rows (asset count stable).",
+      "Run dev-down.sh; verify containers stopped.",
+      "Run dev-up.sh again; verify data persisted (documented behavior) and app healthy."
+    ],
+    "expected_result": "Idempotent re-runs; clean teardown; restart preserves data per documented volume behavior; set -euo pipefail present in scripts.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable where commands allowlisted"
+  },
+  {
+    "test_id": "TC-STK-003",
+    "requirement_ids": ["STK-1", "STK-2", "STK-3"],
+    "title": "Backend quality gates pass",
+    "objective": "Verify backend CI-mirror commands pass: ruff format --check, ruff check, mypy, makemigrations --check --dry-run, Django system checks, pytest.",
+    "priority": "Critical",
+    "type": "Build/QualityGate",
+    "preconditions": "backend deliverables present.",
+    "test_data": "none",
+    "steps": [
+      "Run each gate command via available allowlisted commands.",
+      "Record outputs and exit codes; capture pytest summary (counts, duration)."
+    ],
+    "expected_result": "All gates exit 0; pytest suite green; no missing migrations; type checking clean per project config.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-STK-004",
+    "requirement_ids": ["STK-1", "STK-4"],
+    "title": "Frontend quality gates pass",
+    "objective": "Verify frontend CI-mirror commands pass: pnpm lint, pnpm typecheck, pnpm test, pnpm build.",
+    "priority": "Critical",
+    "type": "Build/QualityGate",
+    "preconditions": "frontend deliverables present.",
+    "test_data": "none",
+    "steps": [
+      "Run each gate command.",
+      "Record outputs/exit codes; capture Vitest summary; verify production build artifact generated (.output)."
+    ],
+    "expected_result": "All gates exit 0; strict TypeScript clean; unit tests green; production build succeeds without warnings treated as errors.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-STK-005",
+    "requirement_ids": ["STK-5", "NFR-007"],
+    "title": "Repo hygiene — no secrets, lockfiles present, .env ignored",
+    "objective": "Verify no real secrets committed; .env git-ignored; .env.example present without real values; pnpm-lock.yaml and uv.lock (or documented alternative) committed.",
+    "priority": "High",
+    "type": "Security/RepoHygiene",
+    "preconditions": "repo access.",
+    "test_data": "grep patterns: password, secret, api_key, BEGIN.*PRIVATE KEY; file checks",
+    "steps": [
+      "Scan tracked files for secret-like strings and private keys.",
+      "Verify .gitignore includes .env; verify .env is not tracked.",
+      "Verify .env.example exists with placeholder values only.",
+      "Verify lockfiles present at frontend/ and backend/."
+    ],
+    "expected_result": "No secrets in tracked files (seed dev passwords documented in README only, explicitly local); .env ignored and untracked; .env.example complete but placeholder-only; both lockfiles committed.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-STK-006",
+    "requirement_ids": ["STK-2", "STK-3"],
+    "title": "Stack versions documented and ADRs for deviations",
+    "objective": "Verify actual Django/Nuxt/PostgreSQL/Node/Python versions match design A-06 (newest stable policy) or have ADRs recorded in ASSUMPTIONS.md/ADRs.",
+    "priority": "Medium",
+    "type": "Build/Documentation",
+    "preconditions": "deliverables present.",
+    "test_data": "pyproject.toml, package.json, compose.yaml, ASSUMPTIONS.md / docs/adr/",
+    "steps": [
+      "Extract declared versions from manifests and compose file.",
+      "Compare against A-06 policy; check for ADRs where versions deviate."
+    ],
+    "expected_result": "Versions satisfy the newest-stable policy or each deviation has a recorded ADR; Python >=3.12; Node active LTS; PostgreSQL newest stable in compose.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (file inspection)"
+  },
+  {
+    "test_id": "TC-E2E-J6-01",
+    "requirement_ids": ["FR-001", "FR-005", "FR-004", "LAY-1"],
+    "title": "E2E Journey J-6 — sign in, search, open asset",
+    "objective": "End-to-end validation of the canonical Cycle-1 journey: a user signs in, uses global search, and lands on the correct asset detail.",
+    "priority": "Critical",
+    "type": "E2E/Journey",
+    "preconditions": "full stack seeded; Playwright.",
+    "test_data": "operator credentials; known asset tag from seed",
+    "steps": [
+      "Navigate to /; redirected to /login.",
+      "Sign in as operator; land on dashboard.",
+      "Type known tag into global search; select exact-match suggestion.",
+      "Verify asset detail loads with correct tag, name, status badge (icon+text), and history tab shows the creation event.",
+      "Capture screenshots at each step."
+    ],
+    "expected_result": "Journey completes without errors; detail data matches seed/API truth; screenshots retained as evidence; total journey time reasonable (<10s on local stack).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-E2E-J1-01",
+    "requirement_ids": ["FR-003", "FR-004"],
+    "title": "E2E Journey J-1 (Cycle-1 slice) — register a new asset via UI",
+    "objective": "End-to-end validation of asset registration: create form, validation, duplicate warning display, success state, and appearance in register + history.",
+    "priority": "Critical",
+    "type": "E2E/Journey",
+    "preconditions": "full stack seeded; Playwright; operator signed in.",
+    "test_data": "new asset: name 'QA E2E Laptop', category Laptops, serial matching an existing asset to trigger duplicate warning, then unique serial",
+    "steps": [
+      "Open /assets/new; submit empty (validation errors shown).",
+      "Fill required fields with a duplicate serial; observe non-blocking duplicate warning panel.",
+      "Change to unique serial; submit.",
+      "Verify success feedback, redirect to detail, correct data shown.",
+      "Verify new asset appears in /assets list and history tab shows creation event."
+    ],
+    "expected_result": "Validation, duplicate warning, and success flows all behave per design; created asset matches API truth; audit/history entries visible in UI; evidence captured.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (Playwright)"
+  }
+]

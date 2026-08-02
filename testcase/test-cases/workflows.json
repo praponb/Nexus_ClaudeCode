@@ -1,0 +1,296 @@
+[
+  {
+    "test_id": "TC-FR-007-01",
+    "requirement_ids": ["FR-007", "BR-002"],
+    "title": "Assign asset to custodian — happy path",
+    "objective": "Verify POST /assets/:uuid/assign assigns an assignable asset to a custodian, records lifecycle + audit events atomically, and returns updated asset state.",
+    "priority": "Critical",
+    "type": "API/Functional",
+    "preconditions": "Stack seeded; operator session; an asset in status 'Available' (or equivalent assignable status) with no active assignment.",
+    "test_data": "asset A1 (available); custodian = seeded employee user; expected_return_at = future date",
+    "steps": [
+      "POST /api/v1/assets/<A1>/assign with {custodian uuid, expected_return_at, notes} and CSRF + Idempotency-Key headers.",
+      "Inspect response status/body.",
+      "GET /api/v1/assets/<A1> and verify custodian/status fields.",
+      "GET /api/v1/assets/<A1>/history and verify assignment LifecycleEvent with actor, timestamp, summary."
+    ],
+    "expected_result": "201/200 response with updated asset (custodian set, status per transition rules, e.g. 'Assigned'); exactly one active Assignment row (returned_at null); LifecycleEvent + AuditEvent created atomically in the same request; response echoes correlation ID.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (pytest/curl)"
+  },
+  {
+    "test_id": "TC-FR-007-02",
+    "requirement_ids": ["FR-007", "BR-002"],
+    "title": "Reassignment atomically closes prior active assignment",
+    "objective": "Verify assigning an already-assigned asset closes the prior active assignment (returned_at set, close_reason) and opens the new one in one transaction — never two active assignments.",
+    "priority": "Critical",
+    "type": "API/Integration",
+    "preconditions": "Asset A2 with an active assignment to custodian C1.",
+    "test_data": "new custodian C2; Idempotency-Key fresh",
+    "steps": [
+      "POST /assets/<A2>/assign with custodian C2.",
+      "Query assignments for A2 (via API history or DB in pytest).",
+      "Verify prior assignment closed and new one active."
+    ],
+    "expected_result": "Prior assignment has returned_at set + close_reason recorded; new assignment active; DB partial unique constraint holds (exactly one returned_at IS NULL row); both transitions audited; on any mid-failure (simulated in pytest) neither change persists (atomicity).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (pytest)"
+  },
+  {
+    "test_id": "TC-FR-007-03",
+    "requirement_ids": ["FR-007"],
+    "title": "Assign rejected for non-assignable asset states",
+    "objective": "Verify assign is rejected with a stable error code when the asset is in a non-assignable status (e.g., Under Maintenance, In Transit, Retired/Disposed) or fails assignability validation.",
+    "priority": "High",
+    "type": "API/Negative",
+    "preconditions": "Assets in each non-assignable status (seed or mutate via API).",
+    "test_data": "asset under maintenance; asset in transit; disposed asset if reachable",
+    "steps": [
+      "POST /assets/<uuid>/assign for each non-assignable asset.",
+      "Record status codes and error envelopes."
+    ],
+    "expected_result": "Each returns 409 (ASSET_STATUS_TRANSITION_INVALID or ASSIGNMENT_CONFLICT) with user-safe message and correlation_id; no assignment rows created; no lifecycle/audit mutation events beyond the rejected-attempt record if documented.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-007-04",
+    "requirement_ids": ["FR-007", "FR-002"],
+    "title": "Assignment authorization — role and scope enforced",
+    "objective": "Verify only Operator+ roles within scope can assign; employee/auditor get 403; out-of-scope operator gets 404 (no existence leak).",
+    "priority": "Critical",
+    "type": "API/Security",
+    "preconditions": "Seeded users: employee, auditor, operator (scoped dept A), second operator scoped to dept B only; asset in dept B.",
+    "test_data": "asset B1 in department B",
+    "steps": [
+      "POST assign as employee → record status.",
+      "POST assign as auditor → record status.",
+      "POST assign as operator scoped only to dept A against asset B1 → record status.",
+      "POST assign as operator scoped to dept B → success control."
+    ],
+    "expected_result": "employee/auditor → 403 PERMISSION_DENIED; out-of-scope operator → 404 NOT_FOUND (identical to nonexistent asset response); in-scope operator succeeds; denials leak no asset data.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-007-05",
+    "requirement_ids": ["FR-007"],
+    "title": "Custodian receipt acknowledgement",
+    "objective": "Verify the assigned custodian can acknowledge receipt (acknowledged_at set) and acknowledgement is recorded in lifecycle/audit; other users cannot acknowledge on their behalf.",
+    "priority": "Medium",
+    "type": "API/Functional",
+    "preconditions": "Asset assigned to employee E (active assignment, acknowledged_at null).",
+    "test_data": "employee E session; another employee session",
+    "steps": [
+      "As employee E, call the acknowledgement endpoint (per API contract; record actual route from OpenAPI).",
+      "Verify assignment.acknowledged_at set.",
+      "As a different employee, attempt to acknowledge the same assignment."
+    ],
+    "expected_result": "Custodian acknowledgement succeeds and is timestamped + audited; non-custodian attempt → 403/404; re-acknowledgement is idempotent or returns a stable 409.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-008-01",
+    "requirement_ids": ["FR-008"],
+    "title": "Transfer asset between locations — full flow (J-2)",
+    "objective": "Verify transfer creation with origin/destination/reason, In Transit state, recipient confirmation, and intact history across the transfer.",
+    "priority": "Critical",
+    "type": "API/Journey",
+    "preconditions": "Operator session; asset at location L1; destination location L2 seeded.",
+    "test_data": "asset T1 at L1; transfer {to_location L2, reason 'Office move'}; Idempotency-Key",
+    "steps": [
+      "POST /assets/<T1>/transfer with destination + reason.",
+      "Verify asset status becomes In Transit and TransferRecord created (pending/in_transit).",
+      "Attempt a second transfer or assignment while In Transit → expect rejection.",
+      "Confirm receipt as authorized recipient (confirm endpoint per OpenAPI).",
+      "Verify asset location = L2, status back to an assignable state, full history shows transfer events."
+    ],
+    "expected_result": "Transfer lifecycle states transition per rules; conflicting operations during In Transit → 409; confirmation sets location/custodian per payload and records confirmed_by/at; history endpoint shows ordered transfer events with actors; audit events for each transition.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (pytest)"
+  },
+  {
+    "test_id": "TC-FR-008-02",
+    "requirement_ids": ["FR-008"],
+    "title": "Transfer validation — missing destination/reason and invalid destination",
+    "objective": "Verify boundary validation on transfer payload: required destination, reason per transition rules, rejection of inactive/nonexistent destination locations.",
+    "priority": "High",
+    "type": "API/Negative",
+    "preconditions": "Operator session; transferable asset.",
+    "test_data": "(a) no destination; (b) random UUID destination; (c) deactivated location UUID",
+    "steps": [
+      "POST /transfer with each invalid payload.",
+      "Record error envelopes."
+    ],
+    "expected_result": "(a) 400 VALIDATION_FAILED with field_errors on destination; (b)/(c) 400 or 404 without existence leak; no TransferRecord created; asset unchanged (version unchanged).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-008-03",
+    "requirement_ids": ["FR-008", "FR-002"],
+    "title": "Transfer authorization and scope",
+    "objective": "Verify transfer requires Operator+ role and scope over the asset's current location/department; employee/auditor denied; cross-scope denied with 404.",
+    "priority": "High",
+    "type": "API/Security",
+    "preconditions": "As TC-FR-007-04 setup.",
+    "test_data": "asset B1 in dept B; operator A, operator B, employee, auditor",
+    "steps": [
+      "Attempt transfer as each user against asset B1."
+    ],
+    "expected_result": "Only in-scope Operator+ succeeds; vertical escalation → 403; horizontal/scope violation → 404; no data leaked in error bodies.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-009-01",
+    "requirement_ids": ["FR-009", "BR-002"],
+    "title": "Return/check-in closes assignment and applies condition",
+    "objective": "Verify POST /assets/:uuid/return records condition, optional damage notes, destination, closes the active assignment, and sets resulting status per business rules.",
+    "priority": "Critical",
+    "type": "API/Functional",
+    "preconditions": "Asset R1 with active assignment to custodian; operator session.",
+    "test_data": "return payload {condition 'Good', destination location, notes}; second payload {condition 'Damaged', damage description}",
+    "steps": [
+      "POST /assets/<R1>/return with good condition.",
+      "Verify assignment closed (returned_at set), asset status per rules (e.g., Available), condition updated.",
+      "Assign and return a second asset with damaged condition; verify resulting status/flag per rules.",
+      "Verify lifecycle + audit events for both returns."
+    ],
+    "expected_result": "Active assignment closed atomically; condition + resulting status match transition rules; damaged return creates the documented damage record/flag; history shows return events; no active assignment remains.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-009-02",
+    "requirement_ids": ["FR-009"],
+    "title": "Return rejected when no active assignment",
+    "objective": "Verify returning an asset with no active assignment fails with a stable error and no state change.",
+    "priority": "High",
+    "type": "API/Negative",
+    "preconditions": "Asset with no active assignment.",
+    "test_data": "return payload with valid condition",
+    "steps": [
+      "POST /assets/<uuid>/return.",
+      "Record response; re-GET asset."
+    ],
+    "expected_result": "409 ASSIGNMENT_CONFLICT (or documented code) with user-safe message; asset unchanged; no lifecycle/audit mutation events recorded for the rejected attempt.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-010-01",
+    "requirement_ids": ["FR-010"],
+    "title": "Reservation create and overlap conflict prevention",
+    "objective": "Verify reservation creation for an asset over a period, and that overlapping active reservations are rejected (exclusion constraint or service check).",
+    "priority": "High",
+    "type": "API/Functional",
+    "preconditions": "Reservable asset; operator session.",
+    "test_data": "reservation P1: day 1–5; overlapping P2: day 3–7; adjacent P3: day 5–8 (boundary per documented semantics)",
+    "steps": [
+      "Create reservation P1 → success.",
+      "Create overlapping P2 → expect conflict.",
+      "Create adjacent P3 → verify documented boundary behavior (allowed or rejected consistently).",
+      "Verify reservation lifecycle events recorded."
+    ],
+    "expected_result": "P1 confirmed; P2 → 409 with conflict error listing the overlapping reservation (no sensitive data beyond permitted scope); boundary behavior consistent and documented; concurrent double-booking attempt (pytest threads or sequential replay) cannot create two overlapping active reservations.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (pytest)"
+  },
+  {
+    "test_id": "TC-FR-010-02",
+    "requirement_ids": ["FR-010"],
+    "title": "Checkout/return of reservation and overdue identification",
+    "objective": "Verify reservation status lifecycle requested→confirmed→checked_out→returned (or cancelled/expired) and that overdue reservations are identifiable (filter/flag).",
+    "priority": "Medium",
+    "type": "API/Functional",
+    "preconditions": "Confirmed reservation for asset; operator session.",
+    "test_data": "reservation with end date in the past (seed or created with short window)",
+    "steps": [
+      "Check out the reserved asset; verify status + asset state.",
+      "Return it; verify reservation returned and asset available.",
+      "Create/seed an overdue reservation; query the overdue identification surface (filter or dashboard flag)."
+    ],
+    "expected_result": "State transitions per rules with audit trail; invalid transitions (e.g., return before checkout) → 409; overdue reservation appears in overdue identification with correct overdue duration.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-013-01",
+    "requirement_ids": ["FR-013", "BR-003"],
+    "title": "Report asset lost/stolen/missing/damaged with evidence",
+    "objective": "Verify POST /assets/:uuid/report-exception records the exception type, narrative, and evidence; updates asset status per rules; and creates lifecycle/audit events.",
+    "priority": "Critical",
+    "type": "API/Functional",
+    "preconditions": "Operator and employee sessions; assigned asset (employee is custodian) and unassigned asset.",
+    "test_data": "exception types: lost, stolen, missing, damaged; evidence note (+ attachment if attachments delivered)",
+    "steps": [
+      "As custodian employee, report assigned asset damaged with description.",
+      "As operator, report another asset lost with evidence.",
+      "Verify asset status/flag per transition rules for each type.",
+      "Verify history shows the exception events with reporter + timestamp."
+    ],
+    "expected_result": "Each exception recorded with type, reporter, timestamp, evidence reference; status transitions follow rules (e.g., lost→'Lost'); employee can report only own custody assets (else 403/404); events appear in activity feed/history.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-013-02",
+    "requirement_ids": ["FR-013", "BR-003"],
+    "title": "Exception resolution preserves original event (no erasure)",
+    "objective": "Verify resolving an exception (e.g., lost asset recovered) appends a resolution event and never edits/deletes the original exception record.",
+    "priority": "High",
+    "type": "API/Integration",
+    "preconditions": "Asset with an open 'lost' exception.",
+    "test_data": "resolution payload {outcome: recovered, notes}",
+    "steps": [
+      "Resolve the exception via the documented endpoint.",
+      "Query history/activity for the asset.",
+      "Attempt to delete or edit the original exception event (API surface)."
+    ],
+    "expected_result": "Resolution appends new lifecycle + audit events; original exception event unchanged (before/after preserved); no API allows edit/delete of the original event (405/404); asset status updated per rules after resolution.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-E2E-J1-02",
+    "requirement_ids": ["FR-007", "FR-003", "LAY-1"],
+    "title": "E2E Journey J-1 complete — register and assign a laptop",
+    "objective": "Extend the Cycle-1 J-1 slice: after registering a laptop via UI, assign it to a custodian through the workflow UI and verify ack/history visibility.",
+    "priority": "Critical",
+    "type": "E2E/Journey",
+    "preconditions": "Full stack seeded; Playwright; operator and employee credentials.",
+    "test_data": "new laptop asset; custodian = seeded employee",
+    "steps": [
+      "Register new laptop via /assets/new (unique serial).",
+      "Open /assets/<id>/assign; select custodian; set expected return; submit.",
+      "Verify detail page shows custodian, Assigned badge (icon+text), and success feedback only after confirmed backend response.",
+      "Sign in as the custodian; verify asset appears in their 'my assets' scope; acknowledge if UI supports.",
+      "Open /assets/<id>/history and verify registration + assignment events visible with actors."
+    ],
+    "expected_result": "Full journey completes without console errors; no optimistic success before backend confirmation; scoped visibility correct for custodian; history shows both events; screenshots captured as evidence.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-E2E-J2-01",
+    "requirement_ids": ["FR-008", "LAY-1"],
+    "title": "E2E Journey J-2 — transfer asset to another office",
+    "objective": "UI journey for transfer: initiate, observe In Transit state, confirm receipt, verify history and list filters update.",
+    "priority": "High",
+    "type": "E2E/Journey",
+    "preconditions": "Full stack seeded; Playwright; operator credentials; asset at seeded location L1.",
+    "test_data": "destination location L2; reason text",
+    "steps": [
+      "Open asset detail → transfer action; fill destination + reason; submit.",
+      "Verify asset shows In Transit badge (icon+text) and transfer actions disabled appropriately.",
+      "Confirm receipt via UI.",
+      "Verify location updated, badge cleared, history shows transfer chain.",
+      "Filter asset register by destination location and verify asset listed."
+    ],
+    "expected_result": "Each UI state matches backend truth (no optimistic completion); badges use icon+text not color alone; filtered list consistent with new location; evidence captured.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (Playwright)"
+  }
+]

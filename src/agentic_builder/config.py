@@ -2,8 +2,8 @@
 
 All model-provider and workspace settings come from environment variables
 (optionally loaded from a ``.env`` file) so that no credentials or
-environment-specific paths are ever hard-coded. See ``.env.example`` for the
-full list of supported variables.
+environment-specific paths are ever hard-coded. See the repo-root ``.env``
+(and README.md) for the full list of supported variables.
 """
 
 from __future__ import annotations
@@ -53,6 +53,9 @@ class Settings(BaseSettings):
     workspace: Path = Field(default=Path("."), alias="AGENTIC_BUILDER_WORKSPACE")
     cycles: int = Field(default=3, alias="AGENTIC_BUILDER_CYCLES")
     log_level: str = Field(default="INFO", alias="AGENTIC_BUILDER_LOG_LEVEL")
+    agent_timeout_seconds: float = Field(
+        default=2400.0, alias="AGENTIC_BUILDER_AGENT_TIMEOUT_SECONDS"
+    )
 
     # Set by the CLI, not read from the environment.
     dry_run: bool = False
@@ -92,7 +95,7 @@ def validate_model_config(settings: Settings) -> None:
             "For the default MODEL_PROVIDER=moonshot / MODEL_NAME=kimi-k3, create one "
             "at https://platform.kimi.ai/console/api-keys (requires an account with "
             "at least a $1 top-up) and set MODEL_API_KEY in your .env file. "
-            "See .env.example and README.md for full setup steps."
+            "See README.md for full setup steps."
         )
 
 

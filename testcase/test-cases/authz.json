@@ -1,0 +1,128 @@
+[
+  {
+    "test_id": "TC-FR-002-01",
+    "requirement_ids": ["FR-002"],
+    "title": "Role capability map — each seeded role gets correct access",
+    "objective": "Verify the six seeded roles can/cannot access endpoint classes per the role capability map (design §9.3).",
+    "priority": "Critical",
+    "type": "API/Security",
+    "preconditions": "Sessions for admin, manager, deptmgr, operator, employee, auditor.",
+    "test_data": "matrix: GET /assets (all), POST /assets (operator+ allowed; employee/auditor denied), PATCH /assets/:uuid (operator+ allowed), reference-data GET (all), reference-data POST/PATCH (admin/manager per design), dashboard summary (all)",
+    "steps": [
+      "For each role, attempt each endpoint in the matrix.",
+      "Record status codes and build the observed access matrix.",
+      "Compare to the design capability map."
+    ],
+    "expected_result": "Observed matrix matches design: employee and auditor receive 403 PERMISSION_DENIED on asset create/update; auditor cannot mutate anything; admin unrestricted; denied responses use error envelope and leak no data.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (pytest)"
+  },
+  {
+    "test_id": "TC-FR-002-02",
+    "requirement_ids": ["FR-002"],
+    "title": "Department scope filtering on asset list",
+    "objective": "Verify a department-scoped user (deptmgr) sees only assets within their scope in list endpoints.",
+    "priority": "Critical",
+    "type": "API/Security",
+    "preconditions": "deptmgr user scoped to department A; seed assets exist in departments A and B.",
+    "test_data": "deptmgr session; asset tags known to belong to dept A and dept B",
+    "steps": [
+      "GET /api/v1/assets as deptmgr; collect all returned asset departments.",
+      "GET /api/v1/assets as admin; confirm assets from dept B exist in the system.",
+      "Compare counts and department sets."
+    ],
+    "expected_result": "deptmgr list contains only department-A assets; dept-B assets never appear; pagination count reflects scoped total, not global total.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-002-03",
+    "requirement_ids": ["FR-002", "NFR-007"],
+    "title": "Horizontal escalation — direct detail access to out-of-scope asset",
+    "objective": "Verify a scoped user cannot read an out-of-scope asset by guessing its UUID (404, not 403, to avoid existence leak).",
+    "priority": "Critical",
+    "type": "API/Security",
+    "preconditions": "UUID of a department-B asset (obtained as admin); deptmgr session scoped to dept A.",
+    "test_data": "out-of-scope asset UUID",
+    "steps": [
+      "As deptmgr, GET /api/v1/assets/<dept-B-uuid>.",
+      "Attempt PATCH on the same UUID.",
+      "Attempt GET /api/v1/assets/<dept-B-uuid>/history."
+    ],
+    "expected_result": "All return 404 NOT_FOUND (per §11.2 existence-leak avoidance) with error envelope; no asset data disclosed; no mutation occurs.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-002-04",
+    "requirement_ids": ["FR-002", "NFR-007"],
+    "title": "Vertical escalation — low-privilege role attempts privileged mutations",
+    "objective": "Verify employee/auditor sessions cannot create/modify assets or reference data even by direct API calls bypassing the UI.",
+    "priority": "Critical",
+    "type": "API/Security",
+    "preconditions": "employee and auditor sessions; valid asset-create payload (captured from operator flow).",
+    "test_data": "valid POST /assets payload; valid PATCH payload; reference-data POST payload",
+    "steps": [
+      "As employee: POST /api/v1/assets; PATCH an in-scope visible asset if any; POST /api/v1/reference-data/categories.",
+      "As auditor: repeat the same attempts.",
+      "Verify no records were created/changed (query as admin)."
+    ],
+    "expected_result": "All attempts return 403 PERMISSION_DENIED; database unchanged; audit of denied attempt optional but no mutation audit events generated.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-002-05",
+    "requirement_ids": ["FR-002"],
+    "title": "Field-level restriction — financial fields hidden from unauthorized roles",
+    "objective": "Verify purchase_price/purchase_currency and other finance fields are serialized only for roles with finance.view.",
+    "priority": "High",
+    "type": "API/Security",
+    "preconditions": "Seed asset with purchase price set; sessions for a finance-authorized role (per seed config, e.g. admin/manager) and a non-authorized role (employee/auditor/operator per capability map).",
+    "test_data": "asset with purchase_price=1500.00 USD",
+    "steps": [
+      "GET /api/v1/assets/<uuid> as finance-authorized role; record financial fields.",
+      "GET same asset as non-authorized role; record fields present.",
+      "GET /api/v1/assets list as non-authorized role; check list serialization too."
+    ],
+    "expected_result": "Authorized role sees money object {amount, currency}; non-authorized roles receive no financial fields (absent or null per contract) in both detail and list responses.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-002-06",
+    "requirement_ids": ["FR-002"],
+    "title": "UI hides unauthorized actions but backend remains boundary",
+    "objective": "Verify /auth/me capability flags drive UI (employee sees no Create Asset button) and that the backend still denies forged requests.",
+    "priority": "High",
+    "type": "UI/API",
+    "preconditions": "UI running; employee and operator accounts.",
+    "test_data": "employee and operator sessions",
+    "steps": [
+      "Sign in as employee; inspect nav/top bar and /assets page for create/edit affordances.",
+      "Attempt direct navigation to /assets/new as employee.",
+      "Sign in as operator; verify create/edit affordances visible."
+    ],
+    "expected_result": "Employee UI hides Create/Edit actions; direct /assets/new navigation as employee yields 403 page or redirect with no data entry possible; operator sees the actions. (Backend denial verified separately in TC-FR-002-04.)",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-FR-002-07",
+    "requirement_ids": ["FR-002"],
+    "title": "Scope enforcement on search and dashboard endpoints",
+    "objective": "Verify /search/assets and /dashboard/summary results are scope-filtered (no cross-scope totals that mislead).",
+    "priority": "High",
+    "type": "API/Security",
+    "preconditions": "deptmgr scoped to dept A; known dept-B assets with distinctive names.",
+    "test_data": "search term matching a dept-B asset name",
+    "steps": [
+      "As deptmgr, GET /api/v1/search/assets?q=<dept-B asset name>.",
+      "As deptmgr, GET /api/v1/dashboard/summary; note total asset count.",
+      "As admin, GET /api/v1/dashboard/summary; compare totals."
+    ],
+    "expected_result": "Search returns no dept-B assets for deptmgr; deptmgr dashboard totals are lower than admin's and reflect only permitted records; totals reconcile with deptmgr's filtered asset list count.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  }
+]

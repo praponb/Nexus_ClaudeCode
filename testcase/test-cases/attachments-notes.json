@@ -1,0 +1,110 @@
+[
+  {
+    "test_id": "TC-FR-015-01",
+    "requirement_ids": ["FR-015", "D-04"],
+    "title": "Attachment upload — valid file succeeds with sanitized metadata",
+    "objective": "Verify POST /assets/:uuid/attachments accepts an allowlisted file type within size limits, stores with random storage key, sanitizes filename, and audits the upload.",
+    "priority": "Critical",
+    "type": "API/Functional",
+    "preconditions": "Operator session; asset with attachments enabled; media volume/minio running.",
+    "test_data": "valid PNG (<1MB) named '../../../evil pic.png'; valid PDF",
+    "steps": [
+      "Upload the PNG via multipart POST.",
+      "Verify response metadata (uuid, sanitized filename, content_type, size, uploaded_by/at).",
+      "Verify audit event for upload exists.",
+      "Verify stored filename/storage_key contains no path traversal segments."
+    ],
+    "expected_result": "201 with metadata; filename sanitized (no traversal, safe chars); storage key random/opaque; audit event with actor + target; direct storage URL never exposed (download only via authorized endpoint).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-015-02",
+    "requirement_ids": ["FR-015", "NFR-007"],
+    "title": "Attachment upload validation — type, signature, size rejection",
+    "objective": "Verify uploads are rejected on disallowed extension, MIME/content-signature mismatch, and oversize, with proper status codes and no partial storage.",
+    "priority": "Critical",
+    "type": "API/Security",
+    "preconditions": "Operator session.",
+    "test_data": "(a) .exe file; (b) .png extension with executable content (signature mismatch); (c) file exceeding configured limit (default 10MB); (d) SVG with embedded script if SVG not allowlisted",
+    "steps": [
+      "Attempt each upload; record status/error envelope.",
+      "Verify no Attachment row or stored object remains for rejected uploads."
+    ],
+    "expected_result": "(a)/(b) 400 or 415 with user-safe code; (c) 413; (d) rejected or sanitized per documented policy; rejections leak no server paths; no orphaned files/rows; attempts audited if documented.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-015-03",
+    "requirement_ids": ["FR-015", "FR-002", "D-04"],
+    "title": "Attachment download authorization — no direct URLs, scope enforced",
+    "objective": "Verify downloads flow only through the authorized backend endpoint; unauthenticated → 401, out-of-scope → 404, and no direct storage URL is reachable.",
+    "priority": "Critical",
+    "type": "API/Security",
+    "preconditions": "Asset with attachment in dept B; users: no session, dept-A operator, dept-B operator, auditor.",
+    "test_data": "attachment download URL; guessed storage key URL (from response metadata)",
+    "steps": [
+      "GET download endpoint without session → expect 401.",
+      "GET as dept-A operator → expect 404 (no existence leak).",
+      "GET as dept-B operator → 200 with correct content + Content-Disposition.",
+      "Attempt direct storage URL access (if resolvable) → must not be publicly served."
+    ],
+    "expected_result": "All access controlled per scope; correct bytes returned for authorized users; time-limited/authorized endpoint only (D-04); download audited.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-015-04",
+    "requirement_ids": ["FR-015"],
+    "title": "Attachment replace/remove audited; documents tab UX",
+    "objective": "Verify DELETE /assets/:uuid/attachments/:uuid removes per policy (with audit event) and the /assets/[id]/documents UI lists, uploads, downloads, and removes attachments with correct states.",
+    "priority": "High",
+    "type": "API + UI",
+    "preconditions": "Asset with 2 attachments; operator session.",
+    "test_data": "delete one attachment; upload one via UI",
+    "steps": [
+      "DELETE one attachment via API; verify removal + audit event.",
+      "Open documents tab in UI; verify list matches API; upload a file via UI; verify progress + success only after server confirm.",
+      "Verify remove action uses confirmation dialog naming the file."
+    ],
+    "expected_result": "Delete audited with actor/timestamp; removed attachment no longer downloadable (404); UI states (loading/empty/error) per design; destructive confirmation present; employee role cannot delete others' attachments if policy restricts (verify documented behavior).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (pytest + Playwright)"
+  },
+  {
+    "test_id": "TC-FR-016-01",
+    "requirement_ids": ["FR-016"],
+    "title": "Notes — create with author + timestamp, visibility permissions",
+    "objective": "Verify POST /assets/:uuid/notes creates a note with author and UTC timestamp, visible on the asset to permitted users, hidden where policy restricts.",
+    "priority": "High",
+    "type": "API/Functional",
+    "preconditions": "Operator session; asset visible to operator + auditor.",
+    "test_data": "note body with Unicode + markup-like text '<b>bold</b>'",
+    "steps": [
+      "POST note; verify response (author, created_at UTC, body stored as text).",
+      "Fetch asset activity/notes as operator and auditor; verify visibility per policy.",
+      "Render note in UI; verify markup-like text displays as literal text (no HTML injection)."
+    ],
+    "expected_result": "Note persisted with author + timestamp; bodies rendered as escaped text; visibility matches permission policy; note creation audited/in activity feed per design.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-016-02",
+    "requirement_ids": ["FR-016", "BR-003"],
+    "title": "Notes edit policy — append-only corrective notes (v1)",
+    "objective": "Verify notes cannot be edited or deleted; corrections are new appended notes referencing context, preserving full history.",
+    "priority": "Medium",
+    "type": "API/Negative",
+    "preconditions": "Asset with an existing note by operator.",
+    "test_data": "PATCH/DELETE attempts on the note; corrective follow-up note",
+    "steps": [
+      "Attempt PATCH and DELETE on the note endpoint (or verify absence of such endpoints in OpenAPI).",
+      "Post a corrective note; verify both notes visible chronologically."
+    ],
+    "expected_result": "Edit/delete not possible (405/404, no such routes in schema); original note immutable; corrective note appended with its own author/timestamp; feed ordering reverse-chronological with both entries intact.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  }
+]

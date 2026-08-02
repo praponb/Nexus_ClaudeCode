@@ -1,0 +1,75 @@
+[
+  {
+    "test_id": "TC-FR-025-01",
+    "requirement_ids": ["FR-025"],
+    "title": "Audit event completeness for Cycle-1 mutations",
+    "objective": "Verify every delivered mutation path (login success/fail/logout, asset create, asset update) produces an AuditEvent with required fields: actor, actor_type, action, target, before/after, outcome, correlation_id, UTC timestamp.",
+    "priority": "Critical",
+    "type": "API/Integration",
+    "preconditions": "audit query access (pytest DB or admin API).",
+    "test_data": "one of each mutation performed in earlier tests",
+    "steps": [
+      "Perform: failed login, successful login, asset create, asset PATCH, logout.",
+      "Query all new AuditEvents.",
+      "Validate required field presence and types for each."
+    ],
+    "expected_result": "5 matching events found; every event has non-null actor (or anonymous identifier for failed login), action, created_at UTC, outcome, correlation_id; create has before=null/after=snapshot; update has both snapshots; no secrets (passwords, session IDs, CSRF tokens) in any payload.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (pytest)"
+  },
+  {
+    "test_id": "TC-FR-025-02",
+    "requirement_ids": ["FR-025"],
+    "title": "Audit hash chain integrity fields present",
+    "objective": "Verify audit rows carry prev_hash/record_hash forming a verifiable SHA-256 chain per design §10.1.",
+    "priority": "High",
+    "type": "Data Integrity",
+    "preconditions": "several audit events exist (from TC-FR-025-01).",
+    "test_data": "all audit rows ordered by created_at",
+    "steps": [
+      "Fetch audit rows in insertion order.",
+      "Verify each record_hash is a 64-hex SHA-256 value.",
+      "Verify each row's prev_hash equals the previous row's record_hash (genesis row excepted).",
+      "If the hashing formula is documented, recompute one record_hash and compare."
+    ],
+    "expected_result": "Chain links are consistent; recomputation (where formula documented) matches; any gap/mismatch is a defect.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (pytest)"
+  },
+  {
+    "test_id": "TC-FR-025-03",
+    "requirement_ids": ["FR-025", "NFR-007"],
+    "title": "Audit events are append-only via application paths",
+    "objective": "Verify no application endpoint allows editing or deleting audit events; direct ORM/DB permission model revokes UPDATE/DELETE for the app role where implemented.",
+    "priority": "High",
+    "type": "Security/Negative",
+    "preconditions": "admin session; audit events exist.",
+    "test_data": "attempted PATCH/DELETE on any exposed audit endpoint; attempted ORM update in pytest (if DB-permission revocation implemented)",
+    "steps": [
+      "Probe API surface for audit mutation endpoints (none should exist for Cycle 1).",
+      "If an audit read endpoint exists, attempt unsafe methods on it.",
+      "In pytest, attempt AuditEvent.objects.filter(...).update(...) and .delete() and observe behavior."
+    ],
+    "expected_result": "No mutation endpoint exists (405/404); unsafe methods rejected; if DB-level revocation implemented, ORM update/delete raises permission error; at minimum, application code provides no edit/delete path and events remain immutable through the API.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-025-04",
+    "requirement_ids": ["FR-025", "NFR-009"],
+    "title": "Correlation ID propagation into audit events",
+    "objective": "Verify a client-supplied X-Correlation-ID on a mutation is echoed in the response and stored on the resulting AuditEvent.",
+    "priority": "Medium",
+    "type": "API/Integration",
+    "preconditions": "operator session; audit query access.",
+    "test_data": "X-Correlation-ID: 11111111-2222-3333-4444-555555555555 on an asset create",
+    "steps": [
+      "POST /assets with the fixed correlation ID header.",
+      "Check response header/body echo.",
+      "Query the AuditEvent for this create."
+    ],
+    "expected_result": "Response echoes the same correlation ID; AuditEvent.correlation_id equals it; when no header is supplied, a server-generated UUID is used consistently across response, logs, and audit.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  }
+]

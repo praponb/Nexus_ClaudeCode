@@ -1,0 +1,106 @@
+[
+  {
+    "test_id": "TC-API-001",
+    "requirement_ids": ["FR-002", "STK-2"],
+    "title": "Error envelope shape on all non-2xx responses",
+    "objective": "Verify every error response (400/401/403/404/409/500) uses the documented envelope: error{code,message,field_errors,correlation_id,retryable}.",
+    "priority": "Critical",
+    "type": "API/Contract",
+    "preconditions": "stack running.",
+    "test_data": "trigger each status: 400 (bad payload), 401 (no auth), 403 (employee create), 404 (random uuid), 409 (stale version), and a forced 500 if safely triggerable",
+    "steps": [
+      "Trigger each error class.",
+      "Parse and validate JSON structure of each response: keys, types, non-empty code/message, UUID correlation_id, boolean retryable."
+    ],
+    "expected_result": "All error bodies conform to the envelope; codes come from the documented stable set; messages are user-safe (no stack traces, SQL, or file paths); HTML error pages never returned for API paths.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-API-002",
+    "requirement_ids": ["STK-2"],
+    "title": "OpenAPI schema available and matches implementation",
+    "objective": "Verify /api/v1/schema/ serves a valid OpenAPI document; backend/openapi.json export works; delivered endpoints are documented and responses validate against schemas.",
+    "priority": "High",
+    "type": "API/Contract",
+    "preconditions": "stack running.",
+    "test_data": "schema fetch; sample responses from assets/auth/dashboard endpoints",
+    "steps": [
+      "GET /api/v1/schema/ — verify 200 and parseable OpenAPI 3.x document.",
+      "Run the documented export script/command producing backend/openapi.json.",
+      "Validate sample live responses against component schemas (schemathesis or manual key checks).",
+      "Confirm all Cycle-1 endpoints from design §11.3 appear in the document."
+    ],
+    "expected_result": "Schema endpoint works unauthenticated-or-as-documented; export artifact generated; all Cycle-1 endpoints documented with request/response schemas; no live response contradicts its schema on field presence/types.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-API-003",
+    "requirement_ids": ["NFR-009"],
+    "title": "Correlation ID echoed on every response",
+    "objective": "Verify all API responses (success and error) include the correlation ID (header or envelope) and accept client-supplied IDs.",
+    "priority": "Medium",
+    "type": "API/Contract",
+    "preconditions": "stack running.",
+    "test_data": "requests with and without X-Correlation-ID across GET/POST/error paths",
+    "steps": ["Send requests with and without the header across endpoint types.", "Record correlation IDs in responses."],
+    "expected_result": "Client-supplied ID echoed verbatim; absent header yields server-generated UUID; error responses carry correlation_id in the envelope.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-API-004",
+    "requirement_ids": ["FR-003", "D-06"],
+    "title": "Money and datetime representations conform to contract",
+    "objective": "Verify money fields serialize as {amount: decimal-string, currency: ISO-4217} and datetimes as ISO 8601 with timezone across all Cycle-1 endpoints.",
+    "priority": "High",
+    "type": "API/Contract",
+    "preconditions": "asset with purchase price, warranty dates, created timestamps.",
+    "test_data": "asset detail, list, dashboard responses",
+    "steps": [
+      "Inspect money fields in asset detail/list responses.",
+      "Inspect all datetime fields.",
+      "Attempt to PATCH purchase_price with a binary-float precision trap value (0.1+0.2 style '19.99' vs '19.990000000001')."
+    ],
+    "expected_result": "Amounts are strings with ≤2 decimal places and a 3-letter currency code; datetimes parse as ISO 8601 with TZ offset; decimal values round-trip exactly (no float artifacts).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-API-005",
+    "requirement_ids": ["FR-001", "NFR-005"],
+    "title": "Health endpoints respond unauthenticated without sensitive data",
+    "objective": "Verify /api/v1/health/live and /health/ready return 200 without auth and expose only infra status.",
+    "priority": "High",
+    "type": "API/Functional",
+    "preconditions": "stack running; no session.",
+    "test_data": "none",
+    "steps": [
+      "GET both health endpoints unauthenticated.",
+      "Inspect bodies for sensitive content (usernames, counts of business data, internal hostnames beyond necessity).",
+      "(If feasible) verify readiness reflects DB connectivity by reviewing implementation or toggling DB in a disposable env."
+    ],
+    "expected_result": "Both return 200 with minimal JSON (status only); no business data or secrets; readiness genuinely checks DB (verified by code review note if runtime toggle not feasible in QA env).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-API-006",
+    "requirement_ids": ["FR-026"],
+    "title": "Reference data endpoints readable by all roles, writable only by authorized",
+    "objective": "Verify GET on categories/statuses/conditions/departments/locations/cost-centers/suppliers works for all authenticated roles; POST/PATCH restricted per design.",
+    "priority": "High",
+    "type": "API/Functional+Security",
+    "preconditions": "sessions for employee (read-only) and admin.",
+    "test_data": "all seven reference-data collections; a create payload for a test category",
+    "steps": [
+      "As employee: GET each collection — expect 200 with seeded rows.",
+      "As employee: POST/PATCH each collection — expect 403.",
+      "As admin: POST a new category; PATCH it; verify changes persisted and audited."
+    ],
+    "expected_result": "Reads succeed for all roles with pagination envelope; writes denied to unauthorized roles with PERMISSION_DENIED; admin writes succeed (201/200) and produce audit events; deactivated/in-use protections per BR-004 noted for Cycle 3 admin UI.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  }
+]

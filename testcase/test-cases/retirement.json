@@ -1,0 +1,150 @@
+[
+  {
+    "test_id": "TC-FR-014-01",
+    "requirement_ids": ["FR-014", "BR-006"],
+    "title": "Retire an asset — controlled transition with lifecycle/audit records",
+    "objective": "Verify POST /assets/:uuid/retire moves an eligible asset to Retired status with reason, records lifecycle + audit events atomically, and retired assets are excluded from assignment/maintenance actions.",
+    "priority": "Critical",
+    "type": "API/Functional",
+    "preconditions": "Operator+/Manager session per transition rules; asset in an eligible status (e.g., In Stock/Available, no open blockers).",
+    "test_data": "asset RT-1; retire payload {reason 'End of life'}; Idempotency-Key",
+    "steps": [
+      "POST /api/v1/assets/<RT-1>/retire with reason + Idempotency-Key.",
+      "Verify status transition and response shape.",
+      "Attempt to assign RT-1 after retirement → expect 409.",
+      "Verify history/audit entries for the retirement."
+    ],
+    "expected_result": "200 with asset in Retired status; lifecycle + audit events with actor/timestamp/reason; subsequent assign/reserve/maintenance-create rejected with stable 409 code; role gating per transition rules (employee/auditor → 403).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-014-02",
+    "requirement_ids": ["FR-014", "BR-006"],
+    "title": "Disposal blockers enforced — 409 DISPOSAL_BLOCKED lists every blocker",
+    "objective": "Verify POST /assets/:uuid/dispose is rejected with 409 DISPOSAL_BLOCKED enumerating blockers when the asset has an open assignment, open maintenance record, active reservation, in-transit transfer, or pending approval.",
+    "priority": "Critical",
+    "type": "API/Negative",
+    "preconditions": "Assets each carrying one blocker class (assigned; open maintenance; active reservation; in-transit; pending approval once approvals exist).",
+    "test_data": "dispose payload {method <disposal method uuid>, reason 'Salvage'} per blocked asset",
+    "steps": [
+      "POST /assets/<blocked-uuid>/dispose for each blocker class.",
+      "Record status, error code, and blocker list contents.",
+      "Clear the blocker (return asset / complete maintenance / cancel reservation) and retry → expect success."
+    ],
+    "expected_result": "Each blocked attempt → 409 DISPOSAL_BLOCKED with the full list of current blockers (user-safe, no over-disclosure); no partial state change (status unchanged, no disposal dates set); after clearing blockers, disposal succeeds; all attempts audited per policy.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-014-03",
+    "requirement_ids": ["FR-014"],
+    "title": "Dispose asset — terminal state, method/reason/proceeds recorded, non-reusable",
+    "objective": "Verify successful disposal records disposal date, method, reason, and (finance-gated) proceeds; disposed assets are terminal by default and cannot be assigned/transferred/edited into reuse.",
+    "priority": "Critical",
+    "type": "API/Functional",
+    "preconditions": "Retired (or eligible) asset with no blockers; disposal methods seeded; manager session with finance.view; operator session without.",
+    "test_data": "dispose payload {method, reason, proceeds {amount '150.00', currency 'USD'}}",
+    "steps": [
+      "POST /assets/<uuid>/dispose as manager.",
+      "Verify response + asset fields (disposal date/method/reason, status disposed).",
+      "Verify proceeds visible to finance-capable roles and hidden from operator.",
+      "Attempt assign/transfer/reserve/retire again/PATCH-to-in-stock on the disposed asset."
+    ],
+    "expected_result": "Disposal persisted with method+reason+date; proceeds finance-gated; status disposed is terminal — all reuse attempts rejected 409 with stable codes; lifecycle + audit events complete.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-014-04",
+    "requirement_ids": ["FR-014", "FR-002"],
+    "title": "Disposal with blockers — authorized exception path (if enabled)",
+    "objective": "Verify the documented authorized-exception behavior: only the designated elevated role may dispose despite blockers (when the feature is enabled by config), with mandatory recorded justification; otherwise confirm no bypass exists.",
+    "priority": "High",
+    "type": "API/Security",
+    "preconditions": "Asset with an open blocker; users: elevated role (per config, e.g., system_admin), regular manager.",
+    "test_data": "dispose payload with justification text; config flag state recorded",
+    "steps": [
+      "As regular manager, attempt dispose with justification → expect 409 DISPOSAL_BLOCKED (no bypass).",
+      "As elevated role, attempt dispose with justification; record outcome.",
+      "If exception succeeded: verify justification stored + audited; if rejected: verify documented 'no exception in v1' behavior."
+    ],
+    "expected_result": "Behavior matches the documented configuration: exception only for the elevated role with recorded justification (immutable audit), or uniform blocking. Regular roles never bypass BR-006.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-014-05",
+    "requirement_ids": ["FR-014", "BR-003"],
+    "title": "Reopen disposed asset — elevated permission + recorded justification, history preserved",
+    "objective": "Verify POST /assets/:uuid/reopen requires elevated permission and a recorded justification, appends (never erases) lifecycle history, and returns the asset to a documented non-disposed status.",
+    "priority": "High",
+    "type": "API/Functional",
+    "preconditions": "Disposed asset; manager (non-elevated) and elevated-role sessions.",
+    "test_data": "reopen payload {justification 'Disposed in error — asset recovered from supplier'}; Idempotency-Key",
+    "steps": [
+      "Attempt reopen as manager without justification → expect 400/403.",
+      "Attempt reopen as manager with justification → expect 403 (not elevated).",
+      "Reopen as elevated role with justification → verify success + resulting status.",
+      "Verify history shows retire→dispose→reopen chain with all events intact."
+    ],
+    "expected_result": "Justification mandatory (400 without it); non-elevated → 403; elevated reopen succeeds to documented status; original disposal record preserved (BR-003); audit events capture actor + justification; replay with same Idempotency-Key does not double-apply.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-014-06",
+    "requirement_ids": ["FR-014", "FR-002"],
+    "title": "Disposed assets searchable to authorized users, hidden/scoped appropriately",
+    "objective": "Verify disposed assets remain findable via search/list filters (status=disposed) for authorized roles within scope, and remain invisible across scopes (404) — non-reusable but auditable.",
+    "priority": "Medium",
+    "type": "API/Functional",
+    "preconditions": "Disposed asset in dept A; admin, dept-A deptmgr, dept-B deptmgr sessions.",
+    "test_data": "GET /assets?status=disposed (or status_code=disposed); /search/assets?q=<tag>",
+    "steps": [
+      "As admin: filter list by disposed status → asset present.",
+      "As dept-A deptmgr: same filter → asset present.",
+      "As dept-B deptmgr: list + direct detail access → absent / 404."
+    ],
+    "expected_result": "Disposed assets discoverable by authorized in-scope users with correct status badge semantics; scope hiding intact (ADR-007 404); counts in dashboard/report aggregates consistent with the same rule.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-014-07",
+    "requirement_ids": ["FR-014", "FR-024"],
+    "title": "Disposal requiring approval — pending until decided (integration with FR-024)",
+    "objective": "Verify that when the disposal transition rule requires approval, dispose creates a pending ApprovalRequest instead of executing, and the disposal executes only on approval (rejection leaves asset unchanged).",
+    "priority": "High",
+    "type": "API/Integration",
+    "preconditions": "Transition rule with requires_approval for disposal enabled (seed/config); requester + approver users.",
+    "test_data": "dispose request by manager; approve by deptmgr/admin; second case rejected",
+    "steps": [
+      "POST dispose → verify 202/pending response with approval reference; asset NOT yet disposed.",
+      "Approve via /approvals/:uuid/approve → verify disposal executes (status disposed, events linked).",
+      "Repeat with reject → verify asset unchanged and approval recorded as rejected."
+    ],
+    "expected_result": "Approval-gated disposal follows pending→executed/rejected flow; no disposal before decision; full correlation between approval and lifecycle/audit events; requester cannot approve own request (separation of duties when enabled).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-E2E-J5-01",
+    "requirement_ids": ["FR-014", "FR-024", "LAY-1"],
+    "title": "E2E Journey J-5 — retire and dispose of an asset",
+    "objective": "UI journey: retire an asset, attempt disposal with a blocker (verify blocked dialog lists blockers), clear blocker, dispose with method+reason, verify terminal badge + history; approval step included when enabled.",
+    "priority": "High",
+    "type": "E2E/Journey",
+    "preconditions": "Full stack seeded; Playwright; manager + approver credentials.",
+    "test_data": "eligible asset; one blocked asset (open assignment); disposal method",
+    "steps": [
+      "Open asset detail → retire action; confirm dialog names asset + consequence; submit; verify Retired badge.",
+      "On blocked asset: attempt dispose; verify blocker list rendered non-destructively.",
+      "Clear the blocker; dispose with method + reason; verify terminal Disposed badge and disabled actions.",
+      "Open history; verify retire/dispose chain; screenshots as evidence."
+    ],
+    "expected_result": "Journey matches API truth at each step; destructive confirmations per §8.5; no optimistic success; blocked state explained; evidence captured. (If browser runner still unavailable: BLOCKED with justification.)",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (Playwright)"
+  }
+]

@@ -1,0 +1,73 @@
+[
+  {
+    "test_id": "TC-D08-01",
+    "requirement_ids": ["D-08", "FR-003", "ADR-004"],
+    "title": "Idempotency-Key on asset create — replay returns stored response, no duplicate",
+    "objective": "Verify POST /assets with an Idempotency-Key, when retried (network retry/double submit), returns the originally recorded response and creates exactly one asset.",
+    "priority": "Critical",
+    "type": "API/Concurrency",
+    "preconditions": "Operator session; Cycle-2 idempotency implementation merged (ADR-004 closure).",
+    "test_data": "valid asset payload; key K1; same payload replayed with K1 twice (sequential + parallel)",
+    "steps": [
+      "POST /assets with Idempotency-Key K1 → record 201 body (asset uuid, warnings).",
+      "Replay identical request with K1 → compare status/body.",
+      "Fire parallel duplicate requests with K1 (pytest threads).",
+      "Count assets with the generated tag/serial."
+    ],
+    "expected_result": "Replays return the recorded response (same asset uuid + warnings); exactly one Asset, one initial LifecycleEvent, one AuditEvent; parallel attempts serialized safely.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (pytest)"
+  },
+  {
+    "test_id": "TC-D08-02",
+    "requirement_ids": ["D-08"],
+    "title": "Idempotency-Key conflict — same key, different payload",
+    "objective": "Verify reusing a key with a different request body is rejected (request_hash mismatch) rather than silently returning the old response.",
+    "priority": "High",
+    "type": "API/Negative",
+    "preconditions": "Completed request with key K2 on asset create.",
+    "test_data": "K2 + modified payload (different name)",
+    "steps": [
+      "POST /assets with K2 and altered body.",
+      "Record status + error envelope."
+    ],
+    "expected_result": "409 (or documented 4xx) with a stable code indicating idempotency-key reuse with different payload; no new asset created; original record unaffected.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-D08-03",
+    "requirement_ids": ["D-08", "FR-007", "FR-008", "FR-009", "FR-022"],
+    "title": "Idempotency-Key supported on all lifecycle/transition endpoints",
+    "objective": "Verify assign, transfer, return, reserve/checkout, report-exception, stocktake observation, and import commit all honor Idempotency-Key (replay-safe).",
+    "priority": "Critical",
+    "type": "API/Concurrency",
+    "preconditions": "Fixtures for each workflow (assignable asset, transferable asset, active assignment, reservable asset, started stocktake, validated import).",
+    "test_data": "unique key per endpoint; each request executed then replayed with same key",
+    "steps": [
+      "For each endpoint: execute with key, replay with same key, verify single side effect (one assignment close/open pair, one transfer, one return, one observation, one import commit).",
+      "Verify key scoping: same key on a different endpoint or different user is treated as distinct (per user+endpoint scoping)."
+    ],
+    "expected_result": "Every retry-sensitive POST is replay-safe with exactly-once side effects; keys scoped per user+endpoint; 24h TTL behavior documented (expiry test optional/manual if time-mocking unavailable).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (pytest)"
+  },
+  {
+    "test_id": "TC-D08-04",
+    "requirement_ids": ["D-08", "NFR-005"],
+    "title": "Frontend unsafe-retry policy — no blind retries without Idempotency-Key",
+    "objective": "Verify the useApi client never auto-retries unsafe methods without attaching an Idempotency-Key, and attaches correlation IDs on all requests (design §8.4).",
+    "priority": "High",
+    "type": "Frontend/Unit-Integration",
+    "preconditions": "Frontend codebase; Vitest suite.",
+    "test_data": "mocked fetch failing once with network error on POST /assets and GET /assets",
+    "steps": [
+      "Inspect/run frontend unit tests covering useApi retry policy.",
+      "Verify GET retries with backoff; POST without key does not retry; POST with key retries safely.",
+      "Verify X-Correlation-ID header present on every request."
+    ],
+    "expected_result": "Retry policy implemented exactly per §8.4; tests green; correlation ID UUIDv4 per request.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (Vitest inspection/execution)"
+  }
+]

@@ -1,0 +1,74 @@
+[
+  {
+    "test_id": "TC-DEF-101-01",
+    "requirement_ids": ["DEF-101", "DEF-102", "ADR-006", "STK-1"],
+    "title": "ADR-006 verify — dev-up.sh auto-copies canonical bootstrap files to repo root",
+    "objective": "Verify scripts/dev-up.sh, when root compose.yaml/.env.example are absent, copies the canonical backend/ files to the repo root, prints an env-banner notice, and proceeds — closing DEF-101/DEF-102 procedurally.",
+    "priority": "Critical",
+    "type": "Build/Install",
+    "preconditions": "Clean checkout state (root compose.yaml + .env.example absent); script source readable; Docker for full boot (else script-logic verification only).",
+    "test_data": "scripts/dev-up.sh content; simulated fresh-checkout conditions",
+    "steps": [
+      "Inspect scripts/dev-up.sh: verify auto-copy logic for both files, idempotency (no clobber when root files exist), set -euo pipefail, and the notice banner.",
+      "If executable in this environment: run dev-up.sh from a simulated clean root; verify files materialize at root and script continues to stack startup (or fails only on Docker absence, after the copy).",
+      "Verify re-run does not overwrite a locally modified root .env.example (document clobber policy)."
+    ],
+    "expected_result": "Documented clean-checkout bootstrap works via auto-copy (ADR-006); canonical backend/ files untouched; behavior idempotent; DEF-101/DEF-102 closable (full boot evidence if Docker available, else script-logic evidence + BLOCKED note for boot).",
+    "status": "NOT_RUN",
+    "automation_status": "script inspection automatable; full boot requires Docker"
+  },
+  {
+    "test_id": "TC-DEF-103-01",
+    "requirement_ids": ["DEF-103", "ADR-003", "STK-2"],
+    "title": "DEF-103 disposition — uv.lock generated, or documented risk re-asserted with evidence",
+    "objective": "Close DEF-103 if a uv-capable environment exists (uv.lock committed + consistent with pyproject); otherwise verify the ADR-003 documented-risk statement is current and accurate.",
+    "priority": "Medium",
+    "type": "Build/QualityGate",
+    "preconditions": "Repo access; uv availability check.",
+    "test_data": "backend/uv.lock (presence), pyproject ranges, README ADR-003 note",
+    "steps": [
+      "Check for backend/uv.lock; if present, verify it is tracked and satisfies pyproject ranges (and Dockerfile uses frozen install if documented).",
+      "If absent, verify README/ASSUMPTIONS still documents the deferral accurately (no uv + network in any available environment)."
+    ],
+    "expected_result": "Either lockfile committed (defect closed) or the documented-risk carry is re-verified as truthful for Cycle 3 (release statement must mention it).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (file inspection)"
+  },
+  {
+    "test_id": "TC-DEF-005-02",
+    "requirement_ids": ["DEF-005", "NFR-007", "STK-4"],
+    "title": "DEF-005 disposition — npm-audit critical resolved, mitigated, or formally risk-accepted",
+    "objective": "Record final Cycle-3 disposition of the Cycle-1 critical transitive dev dependency: fixed (lockfile shows patched version), removed, or a written risk-acceptance with justification (dev-only, not shipped, no exploit path in build output).",
+    "priority": "High",
+    "type": "Security/Dependency",
+    "preconditions": "frontend/package-lock.json; frontend README/ASSUMPTIONS; npm audit still not allowlisted (verified C2).",
+    "test_data": "lockfile entries for the flagged package chain; documented risk decision text",
+    "steps": [
+      "Inspect package-lock for the vulnerable package/version if identified in docs; check for upgrades vs the C1 finding.",
+      "Verify a written disposition exists (README/ASSUMPTIONS/release notes): fixed / not-exploitable-dev-only rationale / tracking.",
+      "If no disposition text exists and audit cannot run, file as release-blocking documentation gap."
+    ],
+    "expected_result": "Explicit recorded disposition for the release; absence of both fix and rationale = FAILED with new defect (documentation/risk gap).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (file inspection); audit itself remains allowlist-blocked"
+  },
+  {
+    "test_id": "TC-REL-001",
+    "requirement_ids": ["STK-1", "NFR-010"],
+    "title": "Release readiness — gates green, OpenAPI drift-clean, docs current, defect register reconciled",
+    "objective": "Final gate sweep for the release statement: all executable quality gates green on both sides, OpenAPI committed + drift guard passing, READMEs/ASSUMPTIONS/ADRs current through Cycle 3, and every defect in the register has a status (closed or recorded risk decision).",
+    "priority": "Critical",
+    "type": "Release/Governance",
+    "preconditions": "All C3 deliverables merged.",
+    "test_data": "gate outputs; backend/openapi.json; READMEs; ASSUMPTIONS.md; defect register (DEF-001…006, DEF-101…103, DEF-005, any C3 defects)",
+    "steps": [
+      "Run backend gates (ruff format/check, mypy, pytest) and frontend gates (lint, typecheck, test, build); capture outputs.",
+      "Verify OpenAPI drift guard green and schema includes C3 endpoints (reservations, approvals, notifications, reports, admin, retire/dispose/reopen, data-quality).",
+      "Review docs for C3 accuracy (bootstrap ADR-006, new modules, job ops, backup/restore).",
+      "Reconcile defect register: no open Critical/High without recorded risk decision."
+    ],
+    "expected_result": "All gates green; contract current; docs accurate; defect register fully dispositioned per §17; QA can issue the release-readiness statement honestly (including residual BLOCKED/MANUAL items with their manual procedures).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (gates + inspection)"
+  }
+]

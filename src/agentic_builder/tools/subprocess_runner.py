@@ -16,7 +16,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from agentic_builder.errors import CommandNotAllowlistedError
 from agentic_builder.events import append_event
 from agentic_builder.tools.workspace import resolve_within
 
@@ -28,11 +27,14 @@ ALLOWLIST: dict[str, list[str]] = {
     "npm_run_lint": ["npm", "run", "lint"],
     "npm_run_typecheck": ["npm", "run", "typecheck"],
     "npm_test": ["npm", "test", "--", "--watchAll=false"],
+    "npm_list": ["npm", "list", "--depth=0"],
     "pytest": [sys.executable, "-m", "pytest"],
     "ruff_check": [sys.executable, "-m", "ruff", "check", "."],
     "ruff_format_check": [sys.executable, "-m", "ruff", "format", "--check", "."],
     "mypy": [sys.executable, "-m", "mypy", "."],
     "pip_install_dev": [sys.executable, "-m", "pip", "install", "-e", ".[dev]"],
+    "pip_freeze": [sys.executable, "-m", "pip", "freeze"],
+    "pip_list": [sys.executable, "-m", "pip", "list"],
     "alembic_upgrade_head": ["alembic", "upgrade", "head"],
     "uvicorn_smoke_import": [sys.executable, "-c", "import app.main"],
 }
@@ -51,13 +53,9 @@ def _minimal_env() -> dict[str, str]:
     }
 
 
-def _sanitize_extra_args(extra_args: list[str]) -> list[str]:
-    for arg in extra_args:
-        if not _SAFE_EXTRA_ARG.match(arg):
-            raise CommandNotAllowlistedError(
-                f"Extra argument {arg!r} contains disallowed characters."
-            )
-    return extra_args
+def _unsafe_extra_args(extra_args: list[str]) -> list[str]:
+    """Return the subset of extra_args that fail the safe-character check."""
+    return [arg for arg in extra_args if not _SAFE_EXTRA_ARG.match(arg)]
 
 
 async def run_allowlisted_command(
@@ -71,17 +69,35 @@ async def run_allowlisted_command(
     Args:
       command_key: One of the fixed allowlisted command names (e.g.
         ``"npm_test"``, ``"pytest"``, ``"ruff_check"``). Arbitrary shell
-        strings are never accepted here.
+        strings are never accepted here. An unrecognized key is not a fatal
+        error -- it returns an ``{"error": ...}`` result listing the valid
+        keys, so one agent picking an unavailable command doesn't abort
+        concurrent sibling agents' legitimate work.
       extra_args_json: JSON array of additional argv tokens, restricted to
         safe characters (no shell metacharacters).
       cwd_relative: Working directory relative to the workspace root.
     """
     import json
 
+    workspace = Path(tool_context.state["workspace"])
+    run_dir = Path(tool_context.state["run_dir"])
+    cycle = int(tool_context.state["cycle"])
+    dry_run = bool(tool_context.state.get("dry_run", False))
+
     if command_key not in ALLOWLIST:
-        raise CommandNotAllowlistedError(
-            f"{command_key!r} is not on the command allowlist: {sorted(ALLOWLIST)}"
+        append_event(
+            run_dir,
+            {
+                "type": "command_rejected",
+                "cycle": cycle,
+                "command_key": command_key,
+                "reason": "not_allowlisted",
+            },
         )
+        return {
+            "error": f"{command_key!r} is not on the command allowlist.",
+            "available_commands": sorted(ALLOWLIST),
+        }
 
     try:
         extra_args = json.loads(extra_args_json)
@@ -89,12 +105,20 @@ async def run_allowlisted_command(
         return {"error": f"extra_args_json is not valid JSON: {exc}"}
     if not isinstance(extra_args, list) or not all(isinstance(a, str) for a in extra_args):
         return {"error": "extra_args_json must decode to an array of strings"}
-    extra_args = _sanitize_extra_args(extra_args)
 
-    workspace = Path(tool_context.state["workspace"])
-    run_dir = Path(tool_context.state["run_dir"])
-    cycle = int(tool_context.state["cycle"])
-    dry_run = bool(tool_context.state.get("dry_run", False))
+    unsafe = _unsafe_extra_args(extra_args)
+    if unsafe:
+        append_event(
+            run_dir,
+            {
+                "type": "command_rejected",
+                "cycle": cycle,
+                "command_key": command_key,
+                "reason": "unsafe_extra_args",
+            },
+        )
+        return {"error": f"Extra argument(s) contain disallowed characters: {unsafe!r}"}
+
     cwd = resolve_within(workspace, cwd_relative)
 
     argv = [*ALLOWLIST[command_key], *extra_args]

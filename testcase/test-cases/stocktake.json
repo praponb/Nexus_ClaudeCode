@@ -1,0 +1,111 @@
+[
+  {
+    "test_id": "TC-FR-022-01",
+    "requirement_ids": ["FR-022"],
+    "title": "Create stocktake session with scope, operators, dates, snapshot",
+    "objective": "Verify POST /stocktakes creates a session with name, location scope, assigned operators, start/due dates, and captures a snapshot (snapshot_at) of in-scope assets.",
+    "priority": "Critical",
+    "type": "API/Functional",
+    "preconditions": "Manager session (create permission); seeded locations with assets.",
+    "test_data": "session {name 'Q3 HQ Count', locations [HQ], operators [operator], start today, due +14d}",
+    "steps": [
+      "POST /api/v1/stocktakes with payload.",
+      "GET /stocktakes/<uuid>; verify fields and snapshot timestamp.",
+      "Verify operator (non-manager) cannot create a session (403)."
+    ],
+    "expected_result": "201 with session UUID; snapshot_at recorded; in-scope asset set deterministically derived from locations; creation audited; role gating per route table (Manager create, Operator count).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-022-02",
+    "requirement_ids": ["FR-022"],
+    "title": "Record observations — scanned and manual with outcome classification",
+    "objective": "Verify POST /stocktakes/:uuid/observations records time, operator, location, condition, note/image, and classifies outcomes: found, not-found, unexpected, duplicate-scan, moved, condition-mismatch.",
+    "priority": "Critical",
+    "type": "API/Integration",
+    "preconditions": "Started session over HQ; assets: A-in-scope at HQ, B-in-scope moved to other room, C-out-of-scope (unexpected), asset with different recorded condition.",
+    "test_data": "observations: scan A (found), scan A again (duplicate-scan), scan B at HQ (moved), scan C (unexpected), observe condition change on A variant (condition-mismatch), manual entry for missing tag",
+    "steps": [
+      "Start the session (POST start) if required by contract.",
+      "Submit each observation; record returned outcome classification.",
+      "Submit observation with unknown tag → verify handling (asset nullable, tag_scanned retained)."
+    ],
+    "expected_result": "Each observation classified per spec rules; duplicates detected per session+asset; unknown tags recorded non-destructively; observations idempotent via Idempotency-Key on retry; all observations timestamped with operator identity.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-022-03",
+    "requirement_ids": ["FR-022", "FR-002"],
+    "title": "Stocktake authorization — assigned operators count, others denied",
+    "objective": "Verify only assigned operators (within scope) can submit observations; session visible per role/scope; auditors read-only.",
+    "priority": "High",
+    "type": "API/Security",
+    "preconditions": "Active session with assigned operator O1; unassigned operator O2; employee; auditor.",
+    "test_data": "observation attempts by each user",
+    "steps": [
+      "Submit observation as O1 → success.",
+      "Submit as O2, employee → expect 403/404.",
+      "Read session as auditor → read-only success; mutation attempt → 403."
+    ],
+    "expected_result": "Role/scope enforcement per design; no existence leaks across scopes; denials audited if documented.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-022-04",
+    "requirement_ids": ["FR-022"],
+    "title": "Variance report and close require permission + final report",
+    "objective": "Verify GET /stocktakes/:uuid/variance summarizes found/not-found/unexpected/moved/condition-mismatch counts vs snapshot, and closing a session requires the close permission and produces a final variance report.",
+    "priority": "High",
+    "type": "API/Functional",
+    "preconditions": "Session with recorded observations covering multiple outcome classes.",
+    "test_data": "variance expectations computed from seeded observations",
+    "steps": [
+      "GET variance; reconcile counts against submitted observations + snapshot.",
+      "Attempt close as operator (no close permission) → expect 403.",
+      "Close as manager; verify final report generated and session immutable afterward."
+    ],
+    "expected_result": "Variance counts reconcile exactly with ground truth; close gated by permission; post-close mutations (new observations) rejected with stable error; close audited with actor/timestamp; final report accessible to authorized users.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-022-05",
+    "requirement_ids": ["FR-022", "NFR-002"],
+    "title": "Mobile count UI — usable at 320–480px, connectivity-loss honesty",
+    "objective": "Verify /stocktakes/[id]/count works on a phone viewport (large touch targets, no horizontal scroll) and that connectivity loss shows honest retry UX with no false 'saved' claims (layout §15.3).",
+    "priority": "High",
+    "type": "UI/Responsive",
+    "preconditions": "Playwright with mobile viewport emulation; active session; operator signed in.",
+    "test_data": "viewport 360×740; network offline simulation mid-count",
+    "steps": [
+      "Open count page at 360px; record an observation via manual entry; verify success feedback only after server confirm.",
+      "Simulate offline; attempt another observation; verify queued/retry or clear failure messaging (no false saved).",
+      "Restore connectivity; verify recovery path per documented behavior."
+    ],
+    "expected_result": "Count UI fully operable at small viewport (≥44px targets, no h-scroll); offline attempts never claim success; on reconnect user can retry without duplicates (idempotency key reuse); offline stocktake beyond this is out of scope (D-03) and not falsely implied.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (Playwright network emulation)"
+  },
+  {
+    "test_id": "TC-E2E-J3-01",
+    "requirement_ids": ["FR-022", "LAY-1"],
+    "title": "E2E Journey J-3 — perform a stocktake (execution slice)",
+    "objective": "UI journey: manager creates session, operator counts assets (found + one unexpected), manager reviews variance and closes.",
+    "priority": "High",
+    "type": "E2E/Journey",
+    "preconditions": "Full stack seeded; Playwright; manager + operator credentials.",
+    "test_data": "new session over one small location; 3 in-scope assets; 1 unexpected tag",
+    "steps": [
+      "As manager: create session via /stocktakes wizard; start it.",
+      "As operator: open count page; submit found scans for 2 assets + 1 unexpected tag.",
+      "As manager: open session; review variance summary; close session.",
+      "Verify final report visible and session read-only."
+    ],
+    "expected_result": "Journey completes with UI states matching API truth at each step; variance numbers correct; close produces final report; evidence screenshots captured. (Reconciliation-driven master-data updates may be Cycle-3 polish — record actual behavior, do not force.)",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (Playwright)"
+  }
+]

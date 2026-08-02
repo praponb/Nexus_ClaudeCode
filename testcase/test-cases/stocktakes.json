@@ -1,0 +1,111 @@
+[
+  {
+    "test_id": "TC-FR-022-01",
+    "requirement_ids": ["FR-022"],
+    "title": "Create stocktake session — scope, operators, snapshot",
+    "objective": "Verify POST /stocktakes creates a session with name, location scope, operators, start/due dates, and a snapshot of expected assets.",
+    "priority": "Critical",
+    "type": "API/Functional",
+    "preconditions": "manager session (create permission); operator user for counting; seeded locations with assets.",
+    "test_data": "{name: 'QA Cycle2 Count', locations: [<loc uuid>], operators: [<operator uuid>], start: today, due: +7d}",
+    "steps": [
+      "POST /api/v1/stocktakes; verify 201 with uuid, status draft/created, snapshot_at set.",
+      "Verify session scoped asset set is fixed at snapshot (create a new asset in scope AFTER snapshot; it must not appear as expected).",
+      "Verify audit event for session creation."
+    ],
+    "expected_result": "Session persisted with immutable snapshot of expected assets at snapshot_at; later registrations excluded from expected set; audited.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-022-02",
+    "requirement_ids": ["FR-022", "FR-002"],
+    "title": "Stocktake session authorization",
+    "objective": "Verify only Manager+ can create sessions; operators can count only in assigned sessions; employee/auditor denied.",
+    "priority": "High",
+    "type": "API/Security",
+    "preconditions": "sessions for operator, employee, auditor; existing session assigned to a different operator.",
+    "test_data": "create payload; observation payload",
+    "steps": [
+      "POST /stocktakes as operator → 403 (create is Manager+).",
+      "POST observation by non-assigned operator → 403/404.",
+      "POST observation by assigned operator → success.",
+      "Employee/auditor attempts → 403."
+    ],
+    "expected_result": "Role rules enforced with envelope errors; only assigned operators record observations.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-022-03",
+    "requirement_ids": ["FR-022", "D-08"],
+    "title": "Record observations — found, idempotent scan submission",
+    "objective": "Verify POST /stocktakes/:uuid/observations records time, operator, location, condition, note; repeated submission with same Idempotency-Key does not duplicate.",
+    "priority": "Critical",
+    "type": "API/Functional",
+    "preconditions": "started session; assigned operator; expected asset E in scope.",
+    "test_data": "{tag_scanned: '<E tag>', condition: good, location: <uuid>, note: 'on shelf'} + Idempotency-Key qa-obs-0001",
+    "steps": [
+      "POST observation; verify 201, outcome=found, observed_at set server-side.",
+      "Repeat identical request with same key; verify single observation only.",
+      "Verify lifecycle/audit linkage (observation recorded against session + asset)."
+    ],
+    "expected_result": "Observation persisted with correct classification; idempotent replay safe; events attributable to operator with correlation ID.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-022-04",
+    "requirement_ids": ["FR-022"],
+    "title": "Observation outcome classification — unexpected, duplicate, moved, condition-mismatch",
+    "objective": "Verify outcome classification rules: tag not in snapshot → unexpected; same tag scanned twice → duplicate; found at different location than snapshot → moved; observed condition differs → condition_mismatch; unobserved expected assets → not_found at reconciliation.",
+    "priority": "High",
+    "type": "API/Functional",
+    "preconditions": "session with expected assets at location L1; asset X not in snapshot; asset E expected at L1 with condition 'good'.",
+    "test_data": "observations: X's tag; E's tag twice; E at location L2; E with condition 'damaged'",
+    "steps": [
+      "Submit each observation variant (fresh sessions or per-case fixtures to avoid duplicate suppression).",
+      "Verify outcome values on each observation.",
+      "At reconciliation, verify unobserved expected assets are classified not_found."
+    ],
+    "expected_result": "Each observation classified per rules; not_found derivable at reconciliation; classifications visible in variance data.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-022-05",
+    "requirement_ids": ["FR-022"],
+    "title": "Session lifecycle — start, and close requires permission + variance report",
+    "objective": "Verify session start transitions status and locks scope; close requires authorized role and produces a final variance report; reconciliation review precedes any master-data updates.",
+    "priority": "Critical",
+    "type": "API/Functional",
+    "preconditions": "draft session; started session with observations; manager and operator sessions.",
+    "test_data": "start/close calls; variance endpoint",
+    "steps": [
+      "POST /stocktakes/:uuid/start → status in_progress; verify observations rejected before start in a second draft session (or per contract).",
+      "GET /stocktakes/:uuid/variance → verify found/not_found/unexpected/moved counts reconcile with observations.",
+      "POST close as operator → 403; POST close as manager → 200 with final variance summary.",
+      "Verify closed session rejects further observations (409)."
+    ],
+    "expected_result": "Lifecycle transitions enforced; variance report accurate and required at close; close permission-gated; session immutable after close; full audit trail.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-022-06",
+    "requirement_ids": ["FR-022"],
+    "title": "Mobile count UI — scan/manual observation entry with connectivity-loss honesty",
+    "objective": "Verify /stocktakes/[id]/count works on a mobile viewport: scan or manual entry, immediate confirmation on server success, and honest error + retry on connectivity loss (no false 'saved').",
+    "priority": "Medium",
+    "type": "UI/Responsive",
+    "preconditions": "browser + running stack (BLOCKED if unavailable); started session.",
+    "test_data": "valid tag; simulated offline (network intercept)",
+    "steps": [
+      "On mobile viewport, submit an observation; verify success confirmation only after server response.",
+      "Simulate network failure; submit again; verify explicit failure message + retry, no false saved state."
+    ],
+    "expected_result": "Confirmed-only-on-server-success UX; offline attempts show failure + retry (design D-03/layout §15.3); no data claims without confirmation.",
+    "status": "NOT_RUN",
+    "automation_status": "blocked without browser runner"
+  }
+]

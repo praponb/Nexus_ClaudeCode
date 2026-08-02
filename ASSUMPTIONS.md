@@ -66,6 +66,20 @@ assumption changes or is resolved.
   cycles" requirement can't be silently bypassed by a stray `--cycles 1`
   during manual testing, while still leaving a documented escape hatch for
   development.
+- **SSE streaming is required against the live kimi-k3 API, not optional.**
+  Discovered by live debugging: a non-streaming completion for a moderate
+  (~2KB) generation never returned (confirmed not an auth, rate-limit, or
+  aiohttp-transport-specific issue -- ruled out each individually against
+  the real API); the identical request with streaming enabled returned its
+  first byte in ~2s and completed a ~15KB response in ~5 minutes. kimi-k3's
+  always-on thinking mode means a non-streaming response sends zero bytes
+  until the entire completion is ready, which is exactly the shape of
+  request an idle-connection timeout somewhere in the network path (proxy,
+  load balancer, etc.) will silently kill. The orchestrator therefore always
+  passes `RunConfig(streaming_mode=StreamingMode.SSE)` to `Runner.run_async`
+  (`orchestrator.py`); `DEFAULT_AGENT_TIMEOUT_SECONDS` was raised to 2400s
+  (configurable via `AGENTIC_BUILDER_AGENT_TIMEOUT_SECONDS`) to accommodate
+  the resulting multi-minute real completions on large requirement sets.
 - **Greenfield deliverable**: this repository ships the reusable
   orchestration project itself, not a pre-generated example web app.
   `requirements/` starts with only a placeholder README (real

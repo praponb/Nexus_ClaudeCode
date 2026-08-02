@@ -1,0 +1,162 @@
+[
+  {
+    "test_id": "TC-NFR-002-01",
+    "requirement_ids": ["NFR-002", "LAY-3"],
+    "title": "Responsive matrix smoke on delivered pages",
+    "objective": "Verify delivered pages (login, dashboard, asset register, detail, create/edit, 403/404) render without page-level horizontal scroll and with correct layout mode at the design breakpoints.",
+    "priority": "High",
+    "type": "UI/Responsive",
+    "preconditions": "UI running; operator signed in; Playwright viewport emulation.",
+    "test_data": "viewports: 320x568, 480x800, 768x1024, 1024x768, 1440x900",
+    "steps": [
+      "For each viewport: load /login, /, /assets, /assets/<uuid>, /assets/new.",
+      "Assert document scrollWidth <= viewport width (no horizontal scroll).",
+      "Verify layout mode: bottom nav on mobile, icon rail/drawer on tablet, sidebar on desktop.",
+      "Capture a screenshot per page per viewport into evidence."
+    ],
+    "expected_result": "No horizontal scrolling at any size including 320px; correct navigation pattern per breakpoint; content readable; touch targets >=44x44px on compact sizes; dialogs become full-screen sheets on mobile.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-NFR-002-02",
+    "requirement_ids": ["NFR-002"],
+    "title": "Asset register table-to-card responsive switch",
+    "objective": "Verify the register renders a sortable table with sticky header on desktop and cards with key fields + action menu on mobile, with pagination adapting (numbered vs prev/next).",
+    "priority": "Medium",
+    "type": "UI/Responsive",
+    "preconditions": "UI running; seeded assets.",
+    "test_data": "viewports 1440 and 375",
+    "steps": [
+      "At 1440px: verify table, sortable column headers, sticky header on scroll, numbered pagination.",
+      "At 375px: verify card list shows tag, name, status badge, category/model, custodian/location, action menu; pagination is prev/next; filters open in a bottom sheet with Apply/Clear always visible."
+    ],
+    "expected_result": "Both modes render correctly with equivalent data and actions; no content cut off; filter sheet usable at 320px.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-NFR-003-01",
+    "requirement_ids": ["NFR-003", "LAY-7"],
+    "title": "Automated axe accessibility scan on delivered pages",
+    "objective": "Run axe-core against all Cycle-1 pages at desktop and mobile widths; zero critical/serious violations.",
+    "priority": "Critical",
+    "type": "Accessibility/Automated",
+    "preconditions": "UI running; axe-core integrated in Playwright (or run via @axe-core/playwright).",
+    "test_data": "pages: /login, /, /assets, /assets/<uuid>, /assets/<uuid>/history, /assets/new, /assets/<uuid>/edit, /403, /404",
+    "steps": [
+      "For each page (authenticated where required), run axe at 1440px and 375px.",
+      "Record all violations by impact; save JSON + screenshots to evidence."
+    ],
+    "expected_result": "0 critical and 0 serious violations on every page/width; moderate/minor violations logged as defects with severity assessment.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (Playwright + axe)"
+  },
+  {
+    "test_id": "TC-NFR-003-02",
+    "requirement_ids": ["NFR-003", "LAY-7"],
+    "title": "Keyboard-only pass — sign-in, register list, asset detail",
+    "objective": "Verify complete keyboard operability: skip link, logical tab order, visible focus, no traps, Escape closes overlays with focus restore.",
+    "priority": "Critical",
+    "type": "Accessibility/Manual+Automated",
+    "preconditions": "UI running.",
+    "test_data": "keyboard only (Tab/Shift+Tab/Enter/Escape/arrows)",
+    "steps": [
+      "From /login: Tab from page load — skip link appears first and works; complete sign-in without mouse.",
+      "On /assets: tab through nav, filters, table rows, pagination; activate a row via Enter.",
+      "On asset detail: navigate tabs/history by keyboard.",
+      "Open any dialog/menu; press Escape; verify close + focus restored to trigger.",
+      "Verify active nav item has aria-current."
+    ],
+    "expected_result": "Every interactive element reachable and operable by keyboard; focus indicator visible on all surfaces (dark theme); no keyboard traps; Escape behavior correct; aria-current present on active nav item.",
+    "status": "NOT_RUN",
+    "automation_status": "partially automatable (Playwright keyboard); manual confirmation recommended"
+  },
+  {
+    "test_id": "TC-NFR-003-03",
+    "requirement_ids": ["NFR-003", "LAY-5"],
+    "title": "Dark theme token contrast spot check",
+    "objective": "Verify the layout §5.2 palette pairings used for text/background meet WCAG AA contrast (4.5:1 normal, 3:1 large/UI) and tokens are referenced semantically.",
+    "priority": "High",
+    "type": "Accessibility/Visual",
+    "preconditions": "UI running; computed styles accessible via Playwright; token list from design §7.",
+    "test_data": "pairings: text #F3F6FA on canvas #090D14 and surface #121A26; secondary #B8C4D1 on surface; muted #8795A6 on surface; accent #5EA2FF on canvas; danger #FF6B78 on surface; focus ring #8CC8FF visibility",
+    "steps": [
+      "Sample computed color/background-color of representative elements (body text, secondary text, muted metadata, links/buttons, badges, focus ring).",
+      "Compute contrast ratios programmatically.",
+      "Verify status badges pair icon+text (not color alone) for at least 3 statuses."
+    ],
+    "expected_result": "All sampled text pairings >= 4.5:1 (or >=3:1 for large text/UI components); focus ring clearly visible; statuses distinguishable without color; components use semantic tokens (spot-check built CSS/DOM for absence of hardcoded hex in component styles where feasible).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (computed-style contrast script)"
+  },
+  {
+    "test_id": "TC-NFR-003-04",
+    "requirement_ids": ["NFR-003"],
+    "title": "No flash of unstyled/light theme on load",
+    "objective": "Verify SSR color-scheme bootstrap prevents a light flash: initial HTML carries dark class/color-scheme before hydration.",
+    "priority": "Medium",
+    "type": "UI/Visual",
+    "preconditions": "UI running; hard refresh with cache disabled.",
+    "test_data": "fresh browser context",
+    "steps": [
+      "Fetch the SSR HTML of /login and / (pre-hydration) and inspect <html> attributes and head bootstrap script.",
+      "Record page load with Playwright video/screenshots at early timestamps."
+    ],
+    "expected_result": "SSR HTML includes class='dark' (or equivalent) and inline color-scheme/bootstrap script in head; no light background painted at any point during load.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-NFR-003-05",
+    "requirement_ids": ["NFR-003"],
+    "title": "Error pages 403/404/error are accessible and on-theme",
+    "objective": "Verify error pages render within the shell, use user-safe messages, offer a way back, and pass keyboard/axe checks.",
+    "priority": "Medium",
+    "type": "UI/Accessibility",
+    "preconditions": "UI running.",
+    "test_data": "navigate to /nonexistent-route; employee navigating to /assets/new (403); forced error state if feasible",
+    "steps": [
+      "Visit each error page; verify content, landmarks, and recovery action (link/button).",
+      "Run axe on each; tab through each."
+    ],
+    "expected_result": "Clear, user-safe messaging; recovery navigation present and keyboard-accessible; no stack traces; dark theme applied; axe clean.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-LAY-001",
+    "requirement_ids": ["LAY-1", "LAY-2", "NFR-002"],
+    "title": "App shell structure and navigation per layout spec",
+    "objective": "Verify shell composition: desktop persistent collapsible sidebar + top bar (page context, global search, quick-create, profile); mobile top bar + bottom nav with drawer for secondary items; breadcrumbs on nested desktop pages.",
+    "priority": "High",
+    "type": "UI/Functional",
+    "preconditions": "UI running; operator signed in.",
+    "test_data": "desktop 1440 and mobile 375 viewports",
+    "steps": [
+      "Desktop: verify sidebar items per role, collapse/expand persists during session, top bar elements present, breadcrumbs on /assets/<uuid>.",
+      "Mobile: verify bottom nav (Home, Assets, Scan, Tasks, More) with More opening drawer of secondary items; Scan/Tasks stubs show accessible 'coming soon' empty states rather than broken pages."
+    ],
+    "expected_result": "Shell matches design §6 navigation spec at each breakpoint; stubbed Cycle-2 destinations render deliberate empty states (not 404/500); active section indicated visually and programmatically.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-LAY-002",
+    "requirement_ids": ["LAY-4", "NFR-003"],
+    "title": "Loading/empty states use skeletons and helpful empty content",
+    "objective": "Verify loading skeletons (not spinners-only) on register/detail/dashboard and designed empty states with next-step guidance.",
+    "priority": "Medium",
+    "type": "UI/Usability",
+    "preconditions": "UI running; ability to throttle network (Playwright) and to produce empty result sets.",
+    "test_data": "throttled network; filter combination matching zero assets",
+    "steps": [
+      "Load pages under throttled network; capture skeleton rendering.",
+      "Apply a filter yielding zero results; capture empty state.",
+      "Verify live-region announcement of loading completion for screen readers (aria-live presence)."
+    ],
+    "expected_result": "Skeletons mirror layout; empty states include icon/text + suggested action (e.g., clear filters); dynamic updates announced via live regions; no layout shift surprises.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (Playwright)"
+  }
+]

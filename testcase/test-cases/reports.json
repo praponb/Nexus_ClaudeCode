@@ -1,0 +1,108 @@
+[
+  {
+    "test_id": "TC-FR-021-01",
+    "requirement_ids": ["FR-021"],
+    "title": "Reports catalog lists the 14 default reports with metadata",
+    "objective": "Verify GET /reports returns the 14 default report definitions of spec §FR-021 with type key, name, description, supported filters, and required role — and only for authorized roles (DeptManager+ scoped per route table).",
+    "priority": "High",
+    "type": "API/Contract",
+    "preconditions": "Reports delivered; manager + employee sessions.",
+    "test_data": "GET /api/v1/reports",
+    "steps": [
+      "GET /reports as manager; record the catalog.",
+      "Count + name the report types; compare against the spec's 14.",
+      "GET /reports as employee/auditor per contract (record allowed/denied)."
+    ],
+    "expected_result": "All 14 default report types present with accurate filter metadata; catalog visibility per role rules; any documented subset-for-role behavior is explicit, not silently missing.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-021-02",
+    "requirement_ids": ["FR-021", "FR-002"],
+    "title": "Report totals reconcile with the permitted record set",
+    "objective": "For at least 4 representative reports (asset inventory by status/category, assignment/custodian, maintenance cost, warranty expiring): verify figures reconcile exactly with independent filtered API queries, scoped per requesting user.",
+    "priority": "Critical",
+    "type": "API/DataIntegrity",
+    "preconditions": "Seeded data with known counts incl. finance fields; admin + dept-scoped deptmgr sessions.",
+    "test_data": "GET /reports/:type for chosen types + equivalent /assets, /maintenance queries as ground truth",
+    "steps": [
+      "Run each report as admin; independently compute expected aggregates via list endpoints.",
+      "Compare totals/rows.",
+      "Repeat one report as deptmgr; verify scope intersection (no cross-scope totals)."
+    ],
+    "expected_result": "Every reported total matches ground truth exactly per user scope; finance figures present only for finance-capable roles; discrepancies are defects, not rounding 'tolerances' (money is decimal).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-021-03",
+    "requirement_ids": ["FR-021"],
+    "title": "Report filters and date ranges applied correctly",
+    "objective": "Verify date-range and dimension filters (department, location, category, status, custodian) constrain report results with correct boundary semantics (inclusive/exclusive documented).",
+    "priority": "High",
+    "type": "API/Functional",
+    "preconditions": "Data spanning multiple periods/departments.",
+    "test_data": "report query with date_from/date_to bracketing known records; dept filter; invalid date range (from > to); malformed date",
+    "steps": [
+      "Run report with each filter; verify membership of boundary records.",
+      "Submit from > to and malformed dates; record error handling."
+    ],
+    "expected_result": "Filtered results contain exactly the matching records with documented boundary behavior; invalid ranges → 400 VALIDATION_FAILED with field_errors (no 500); empty result sets return valid empty structures, not errors.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-021-04",
+    "requirement_ids": ["FR-021", "FR-002"],
+    "title": "Report export authorized + sanitized; opens supporting records",
+    "objective": "Verify POST /reports/:type/export produces the export only for authorized roles, applies the same scope/filters/field permissions as the on-screen report, sanitizes formula-leading cells, and that report rows reference openable supporting records (asset UUIDs/links).",
+    "priority": "High",
+    "type": "API/Security",
+    "preconditions": "A populated report; manager (finance) + deptmgr (scoped) + auditor sessions.",
+    "test_data": "export request for the filtered report",
+    "steps": [
+      "Export as each role; verify presence/absence of finance columns and scope of rows.",
+      "Inspect export payload for formula-injection prefixing on dangerous values.",
+      "Verify rows carry identifiers that resolve to permitted detail endpoints (or documented link format)."
+    ],
+    "expected_result": "Export content identical-in-scope to the report view; unauthorized export denied (403/404); sanitization per §13; supporting-record references valid and authorization-checked on use; export audited.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-021-05",
+    "requirement_ids": ["FR-021", "FR-012"],
+    "title": "Warranty/expiry report — window buckets accurate and exportable",
+    "objective": "Verify the warranty/expiry report groups assets into configured windows (expired/30/60/90 days) matching independently computed membership, and is exportable (FR-012).",
+    "priority": "Medium",
+    "type": "API/Functional",
+    "preconditions": "Assets spanning each warranty bucket (from TC-FR-012-01 fixtures).",
+    "test_data": "warranty report default + custom window params if supported",
+    "steps": [
+      "Run report; compare bucket membership/counts to ground truth.",
+      "Export; verify same content + sanitization."
+    ],"expected_result": "Buckets exact per config; expired distinct from expiring; scope-filtered; export matches; notification hooks existence documented (FR-023 linkage).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-021-06",
+    "requirement_ids": ["FR-021", "LAY-1", "NFR-003"],
+    "title": "E2E — reports catalog and viewer UI with accessible tables",
+    "objective": "UI journey: open /reports, select a report, apply filters/date range, verify rendered table matches API, open a supporting record, trigger authorized export.",
+    "priority": "Medium",
+    "type": "E2E/Journey",
+    "preconditions": "Full stack; Playwright; manager credentials.",
+    "test_data": "one report with known data",
+    "steps": [
+      "Open /reports; verify catalog cards/list per role.",
+      "Open a report; apply a date filter; verify loading + table update; spot-check a figure against API.",
+      "Click a supporting record link; verify asset detail opens.",
+      "Export; verify download queued/completed per async pattern."
+    ],
+    "expected_result": "Viewer states complete (loading/empty/error); tables accessible (headers, captions/summary); deep links work; export follows authorized async flow. (Browser-unavailable → BLOCKED.)",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (Playwright)"
+  }
+]

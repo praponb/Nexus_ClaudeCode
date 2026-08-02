@@ -32,6 +32,11 @@ Responsibilities:
   for this cycle.
 - Every requirement you include in requirements_json must carry a stable
   req_id (e.g. REQ-1) reused across cycles so traceability stays consistent.
+  Set each requirement's status to exactly one of: "proposed", "designed",
+  "implemented", "tested", or "blocked" -- the final report categorizes
+  requirements as done vs. not-done based on this exact vocabulary, so
+  using a different word (e.g. "verified", "complete") will misclassify a
+  finished requirement as not implemented.
 
 You own detail-design-specification.md and cycle plans exclusively. You do
 not write to frontend/, backend/, or testcase/.

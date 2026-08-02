@@ -1,0 +1,127 @@
+[
+  {
+    "test_id": "TC-FR-011-01",
+    "requirement_ids": ["FR-011"],
+    "title": "Create maintenance record — typed with provider/dates/result",
+    "objective": "Verify POST /maintenance creates a typed maintenance record (repair/inspection/upgrade per seeded types) with provider, technician, dates, issue, and that it appears on the asset.",
+    "priority": "Critical",
+    "type": "API/Functional",
+    "preconditions": "Operator session; asset M1 available; maintenance types seeded.",
+    "test_data": "record {type 'Repair', issue 'Cracked screen', provider 'FixIt Ltd', technician, started date}",
+    "steps": [
+      "POST /api/v1/maintenance with the payload + Idempotency-Key.",
+      "Verify response and record fields.",
+      "GET /assets/<M1>/history (or maintenance list filtered by asset) and verify record visible."
+    ],
+    "expected_result": "201 with record UUID; record linked to asset with all fields persisted; lifecycle + audit events created; dates validated (completed >= started when both present).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-011-02",
+    "requirement_ids": ["FR-011"],
+    "title": "Asset Under Maintenance while work is open; returned to service on completion (J-4)",
+    "objective": "Verify opening maintenance moves the asset to Under Maintenance (blocking assignment), and completing the record returns it to an assignable status with result + next-due set.",
+    "priority": "Critical",
+    "type": "API/Journey",
+    "preconditions": "Asset M2 with open maintenance record.",
+    "test_data": "completion payload {completed date, result 'Repaired', next_due or interval-derived}",
+    "steps": [
+      "Open maintenance on M2; verify asset status = Under Maintenance.",
+      "Attempt to assign M2 while under maintenance → expect 409.",
+      "POST /maintenance/<uuid>/complete with result.",
+      "Verify asset status returns to assignable state; next_maintenance_due calculated per interval; assignment now possible."
+    ],
+    "expected_result": "Status transitions follow transition rules; conflicting lifecycle ops blocked during maintenance; completion sets result, completed date, and next-due (explicit or interval-derived, documented); full audit trail.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-011-03",
+    "requirement_ids": ["FR-011", "FR-002", "NFR-008"],
+    "title": "Maintenance cost restricted to finance-capable roles",
+    "objective": "Verify maintenance cost fields serialize only for roles with finance.view (admin/manager/auditor); operator/employee/dept manager without finance capability do not receive cost data.",
+    "priority": "High",
+    "type": "API/Security",
+    "preconditions": "Maintenance record with cost {amount, currency} on an asset visible to operator and auditor.",
+    "test_data": "operator session; auditor session; manager session",
+    "steps": [
+      "GET /maintenance/<uuid> (and asset history payloads) as operator, auditor, manager.",
+      "Compare serialized fields."
+    ],
+    "expected_result": "Cost present for finance-capable roles as money object {amount decimal-string, currency}; absent/null for others; no cost leakage in list endpoints, activity feed summaries, or error messages.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-011-04",
+    "requirement_ids": ["FR-011"],
+    "title": "Maintenance list filters and work queue (/maintenance page)",
+    "objective": "Verify GET /maintenance supports filtering by status (open/completed), type, asset, date range with pagination envelope, and the /maintenance UI page renders the work list with correct states.",
+    "priority": "Medium",
+    "type": "API + UI",
+    "preconditions": "Multiple maintenance records seeded/created across types and states.",
+    "test_data": "filters: open only; type=Repair; date range last 30 days",
+    "steps": [
+      "Query list with each filter; verify envelope {count,next,previous,results} and correct row sets.",
+      "Open /maintenance in browser as operator; verify list renders, filters apply, empty state shown when no matches."
+    ],
+    "expected_result": "Server-side filtering correct and permission-scoped; pagination per D-09; UI shows loading/empty/error states; list matches API truth.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (pytest + Playwright)"
+  },
+  {
+    "test_id": "TC-FR-012-01",
+    "requirement_ids": ["FR-012"],
+    "title": "Warranty expiry windows computed and surfaced",
+    "objective": "Verify assets within configurable warranty-expiry windows (e.g., 30/60/90 days) are identified by the dashboard/maintenance queries with correct counts and asset references.",
+    "priority": "High",
+    "type": "API/Functional",
+    "preconditions": "Seeded/created assets with warranty_end dates: expired, within 30d, within 90d, beyond 90d, none.",
+    "test_data": "asset set spanning each warranty bucket",
+    "steps": [
+      "Query dashboard summary warranty-expiring KPI (and any warranty listing endpoint per OpenAPI).",
+      "Verify bucket membership and counts against known data."
+    ],
+    "expected_result": "Counts match ground truth for each window; expired assets distinguishable from expiring; scope filtering applied (dept-scoped user sees only own-scope assets); links lead to correctly filtered asset lists.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable"
+  },
+  {
+    "test_id": "TC-FR-012-02",
+    "requirement_ids": ["FR-012", "NFR-003", "LAY-4"],
+    "title": "Warranty/expiry indicators not color-alone",
+    "objective": "Verify warranty/expiry and maintenance-due indicators in UI use icon + text + semantic color with screen-reader text, never color alone.",
+    "priority": "High",
+    "type": "UI/Accessibility",
+    "preconditions": "Assets with expiring/expired warranty visible in list + detail; browser runner.",
+    "test_data": "asset list page; asset detail page",
+    "steps": [
+      "Open asset register and an asset detail with expiring warranty.",
+      "Inspect indicator markup: icon, visible label, accessible name.",
+      "Verify at 200% zoom and with reduced motion that indicators remain perceivable."
+    ],
+    "expected_result": "Every expiry/maintenance indicator has icon + text label + accessible description; information survives grayscale; no color-only signaling (layout §5.3 mapping).",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (Playwright + axe) partially manual (visual)"
+  },
+  {
+    "test_id": "TC-E2E-J4-01",
+    "requirement_ids": ["FR-011", "LAY-1"],
+    "title": "E2E Journey J-4 — record repair and return to service",
+    "objective": "UI journey: open maintenance on an asset, observe Under Maintenance state, complete the repair with result, verify return-to-service and history.",
+    "priority": "High",
+    "type": "E2E/Journey",
+    "preconditions": "Full stack seeded; Playwright; operator credentials.",
+    "test_data": "asset with no open maintenance; repair details; result 'Repaired'",
+    "steps": [
+      "From asset detail, create maintenance record via UI form (validation: submit empty first, verify errors).",
+      "Verify Under Maintenance badge (icon+text) and blocked assign action in UI.",
+      "Complete the maintenance via UI with result + notes.",
+      "Verify badge cleared, history shows open+complete events, and asset assignable again."
+    ],
+    "expected_result": "Journey matches backend truth at each step; form validation UX per design §8.5 (error summary, focus management); no optimistic success; evidence screenshots captured.",
+    "status": "NOT_RUN",
+    "automation_status": "automatable (Playwright)"
+  }
+]
