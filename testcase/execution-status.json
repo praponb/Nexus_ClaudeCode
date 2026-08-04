@@ -1193,6 +1193,440 @@
     "status": "BLOCKED",
     "test_id": "TC-HARD-002"
   },
+  "TC-HELP-01": {
+    "actual_result": "Sidebar Help link navigated to /help; H1 'Help' and description rendered verbatim; sidebar item shown active.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-01"
+  },
+  "TC-HELP-02": {
+    "actual_result": "Top-bar Help icon click navigates to /help and renders the Help content (all three sections). RETESTED 2026-08-04 after the hydration fix (plugins/hydrated.client.ts + gated useAuth.viewUser/authResolved + ClientOnly page body in layouts/default.vue): now passes, and the page loads with zero console errors and zero Vue hydration warnings.",
+    "cycle_last_executed": 3,
+    "evidence_path": "testcase/evidence/help-ui/FIXED-nav-hydration-clean.png",
+    "status": "PASSED",
+    "test_id": "TC-HELP-02"
+  },
+  "TC-HELP-03": {
+    "actual_result": "Three sections present in order with correct H2 text and aria-labelledby wiring: Finding assets / Registering and editing assets / Access and visibility.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-03"
+  },
+  "TC-HELP-04": {
+    "actual_result": "All 8 bullet strings and the Access-and-visibility paragraph match the expected text verbatim.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-04"
+  },
+  "TC-HELP-05": {
+    "actual_result": "No axe-core integration exposed by the Playwright MCP server in this session (no browser_accessibility_scan-type tool); injecting the local 560KB axe.min.js bundle was impractical via browser_evaluate. Not executed rather than faked.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "BLOCKED",
+    "test_id": "TC-HELP-05"
+  },
+  "TC-HELP-06": {
+    "actual_result": "At 375x812, document.scrollWidth (375) == window.innerWidth (375); no horizontal scroll; all three sections remain visible.",
+    "cycle_last_executed": 3,
+    "evidence_path": "testcase/evidence/help-ui/TC-HELP-06-mobile-375.png",
+    "status": "PASSED",
+    "test_id": "TC-HELP-06"
+  },
+  "TC-HELP-10": {
+    "actual_result": "Combobox present in top bar with accessible name 'Search assets by tag, serial, name, model, custodian, or location'; aria-autocomplete=list, aria-expanded=false when closed.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-10"
+  },
+  "TC-HELP-11": {
+    "actual_result": "Typing a single character 'A' left aria-expanded=false; no listbox opened.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-11"
+  },
+  "TC-HELP-12": {
+    "actual_result": "Search 'AST-100001' returned exactly that asset in the listbox with tag and name shown.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-12"
+  },
+  "TC-HELP-13": {
+    "actual_result": "Constructed pair (AST-000001 exact tag; AST-000002 whose name contains the string 'AST-000001'): searching 'AST-000001' returned AST-000001 first, AST-000002 second \u2014 exact tag match ranked ahead of the substring/name match.",
+    "cycle_last_executed": 3,
+    "evidence_path": "testcase/evidence/help-ui/TC-HELP-13-exact-tag-ranking.png",
+    "status": "PASSED",
+    "test_id": "TC-HELP-13"
+  },
+  "TC-HELP-14": {
+    "actual_result": "Search by serial number 'SN200000' returned AST-100001.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-14"
+  },
+  "TC-HELP-15": {
+    "actual_result": "Search by name 'Laptop unit 1' returned AST-100001 among 10 matches.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-15"
+  },
+  "TC-HELP-16": {
+    "actual_result": "Search by model 'Model-0' returned AST-100001 among the results (verified via /api/v1/search/assets/?q=Model-0).",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-16"
+  },
+  "TC-HELP-17": {
+    "actual_result": "Search by custodian display name 'Employee' returned multiple assets custodied by that user.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-17"
+  },
+  "TC-HELP-18": {
+    "actual_result": "Search by location 'HQ Building 1' returned multiple assets at that location, including AST-100001.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-18"
+  },
+  "TC-HELP-19": {
+    "actual_result": "Clicking the AST-100001 suggestion navigated to /assets/<uuid> with the correct detail page title.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-19"
+  },
+  "TC-HELP-20": {
+    "actual_result": "Typed 'laptop' (10 matches) and pressed Enter with no suggestion highlighted; navigated to /assets?q=laptop with a 'Search: \"laptop\"' chip shown.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-20"
+  },
+  "TC-HELP-21": {
+    "actual_result": "ArrowDown x2 moved aria-activedescendant to option index 1 (aria-selected=true); ArrowUp returned to index 0; Enter on the active option opened that asset; Escape (separately) closed the listbox.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-21"
+  },
+  "TC-HELP-22": {
+    "actual_result": "Query 'zzzz-no-such-asset-zzzz' opened the dropdown showing 'No assets match this search.' with zero options.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-22"
+  },
+  "TC-HELP-23": {
+    "actual_result": "role=status region read '1 result available.' for a single match and 'No assets match this search.' for zero matches.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-23"
+  },
+  "TC-HELP-30": {
+    "actual_result": "Verified all 5 dimensions narrow via API: status=Available->83, condition=New->32, category=Laptop->40, department=Engineering->25, location=HQ Building 1->17 (baseline 200); category+department combo also driven through the real UI selects with matching chip/count.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-30"
+  },
+  "TC-HELP-31": {
+    "actual_result": "category=Laptop (40) + department=Engineering (25) combined via UI selects narrowed to 5 (AND semantics), confirmed both via API count and live chips/result text.",
+    "cycle_last_executed": 3,
+    "evidence_path": "testcase/evidence/help-ui/TC-HELP-31-32-combined-filters-chips.png",
+    "status": "PASSED",
+    "test_id": "TC-HELP-31"
+  },
+  "TC-HELP-32": {
+    "actual_result": "Chips rendered as 'Category: Laptop' and 'Department: Engineering' using reference-data display names, not raw UUIDs.",
+    "cycle_last_executed": 3,
+    "evidence_path": "testcase/evidence/help-ui/TC-HELP-31-32-combined-filters-chips.png",
+    "status": "PASSED",
+    "test_id": "TC-HELP-32"
+  },
+  "TC-HELP-33": {
+    "actual_result": "Removing the 'Category: Laptop' chip dropped only that param from the URL and widened the result to 25 (department-only count), leaving the Department chip intact.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-33"
+  },
+  "TC-HELP-34": {
+    "actual_result": "'Clear all' emptied all chips, returned URL to bare /assets, and result count returned to 200.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-34"
+  },
+  "TC-HELP-35": {
+    "actual_result": "Reloading a copied URL with category+department+ordering params in a fresh full page load reproduced identical chips (2) and identical count (5) as the original.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-35"
+  },
+  "TC-HELP-36": {
+    "actual_result": "Starting from /assets?page=3, applying a Category filter via the UI select dropped the page param entirely from the resulting URL.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-36"
+  },
+  "TC-HELP-37": {
+    "actual_result": "Register free-text box debounces into ?q= with a 'Search: \"laptop\"' chip AND the list is now genuinely filtered: 40 results, every row a Laptop (previously 200 unfiltered rows of every category). FIXED 2026-08-04: DRF SearchFilter was listening on its default ?search= while the whole system uses ?q=, so django-filter silently ignored q; set REST_FRAMEWORK['SEARCH_PARAM']='q'. Also extended AssetViewSet.search_fields with custodian__username/custodian__display_name/location__name, which the filter input's own label and the Help page both promise but which were not searchable even once q was wired. Verified at the API level: q=laptop->40, q=SN200000->1, q=Model-0->29, q=employee(custodian)->38, q='HQ Building 1'(location)->37, q=zzz-no-such-thing->0, q+category combines correctly (baseline 203).",
+    "cycle_last_executed": 3,
+    "evidence_path": "testcase/evidence/help-ui/FIXED-37-q-filter-works.png",
+    "status": "PASSED",
+    "test_id": "TC-HELP-37"
+  },
+  "TC-HELP-38": {
+    "actual_result": "A 4-filter combination yielding 0 results now renders the 'No assets match your filters' EmptyState with a working 'Clear all filters' button. FIXED 2026-08-04 as a side-effect of the TC-HELP-02/50/51 hydration fix: the EmptyState was rendered on the server, but the corrupted hydration patch (insertBefore failure) meant it never survived on the client. With page bodies now client-only it renders correctly.",
+    "cycle_last_executed": 3,
+    "evidence_path": "testcase/evidence/help-ui/FIXED-38-empty-state.png",
+    "status": "PASSED",
+    "test_id": "TC-HELP-38"
+  },
+  "TC-HELP-39": {
+    "actual_result": "At 375px, the Filters button read 'Open filters, 2 active' with a visible '2' badge while category+department filters were applied.",
+    "cycle_last_executed": 3,
+    "evidence_path": "testcase/evidence/help-ui/TC-HELP-39-mobile-filter-badge.png",
+    "status": "PASSED",
+    "test_id": "TC-HELP-39"
+  },
+  "TC-HELP-40": {
+    "actual_result": "Saved a view from category=Laptop + department=Engineering: name form closed, 'Engineering Laptops' appeared selected in the Saved view select and a Delete view button appeared. Server-side config persisted as {\"filters\":{\"category\":\"<uuid>\",\"department\":\"<uuid>\"}} -- structurally identical to the seeded view. FIXED 2026-08-04: frontend now speaks the backend's nested config contract ({filters:{...}, ordering, page_size}) via toSavedViewConfig/savedViewConfigToQuery in utils/filters.ts, instead of sending/spreading the flat URL shape.",
+    "cycle_last_executed": 3,
+    "evidence_path": "testcase/evidence/help-ui/FIXED-40-45-saved-views.png",
+    "status": "PASSED",
+    "test_id": "TC-HELP-40"
+  },
+  "TC-HELP-41": {
+    "actual_result": "From a bare /assets, selecting the saved view rewrote the URL to ?category=<uuid>&department=<uuid> (no '[object Object]'), restored both chips and the same 7-asset count recorded at save time. The seeded 'All active assets' view now applies as ?record_status=active&ordering=tag and its filter genuinely reaches the API (UI 203 == API count 203 for record_status=active), where previously it was silently dropped. FIXED 2026-08-04: frontend now speaks the backend's nested config contract ({filters:{...}, ordering, page_size}) via toSavedViewConfig/savedViewConfigToQuery in utils/filters.ts, instead of sending/spreading the flat URL shape.",
+    "cycle_last_executed": 3,
+    "evidence_path": "testcase/evidence/help-ui/FIXED-40-45-saved-views.png",
+    "status": "PASSED",
+    "test_id": "TC-HELP-41"
+  },
+  "TC-HELP-42": {
+    "actual_result": "Selected the saved view and clicked 'Delete view': it disappeared from the select, the selection reset to None, the Delete view button disappeared, and GET /api/v1/saved-views/ confirmed server-side removal (only the shared seeded view remains). FIXED 2026-08-04: frontend now speaks the backend's nested config contract ({filters:{...}, ordering, page_size}) via toSavedViewConfig/savedViewConfigToQuery in utils/filters.ts, instead of sending/spreading the flat URL shape.",
+    "cycle_last_executed": 3,
+    "evidence_path": "testcase/evidence/help-ui/FIXED-40-45-saved-views.png",
+    "status": "PASSED",
+    "test_id": "TC-HELP-42"
+  },
+  "TC-HELP-43": {
+    "actual_result": "With the name field empty, the 'Save view' button carried the disabled attribute; confirmed via DOM before typing a name.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-43"
+  },
+  "TC-HELP-44": {
+    "actual_result": "The saved view persisted across a full page reload and across a sign-out / sign-in-again cycle as the same user, with its stored filter config intact. FIXED 2026-08-04: frontend now speaks the backend's nested config contract ({filters:{...}, ordering, page_size}) via toSavedViewConfig/savedViewConfigToQuery in utils/filters.ts, instead of sending/spreading the flat URL shape.",
+    "cycle_last_executed": 3,
+    "evidence_path": "testcase/evidence/help-ui/FIXED-40-45-saved-views.png",
+    "status": "PASSED",
+    "test_id": "TC-HELP-44"
+  },
+  "TC-HELP-45": {
+    "actual_result": "A view saved by admin was absent from employee's saved-view list (GET /api/v1/saved-views/ as employee returned only the shared seeded 'All active assets'); no admin-owned view config was exposed. FIXED 2026-08-04: frontend now speaks the backend's nested config contract ({filters:{...}, ordering, page_size}) via toSavedViewConfig/savedViewConfigToQuery in utils/filters.ts, instead of sending/spreading the flat URL shape.",
+    "cycle_last_executed": 3,
+    "evidence_path": "testcase/evidence/help-ui/FIXED-40-45-saved-views.png",
+    "status": "PASSED",
+    "test_id": "TC-HELP-45"
+  },
+  "TC-HELP-50": {
+    "actual_result": "'New asset' in the register header navigates to /assets/new and renders the create form (Asset tag field present). RETESTED 2026-08-04 after the hydration fix (plugins/hydrated.client.ts + gated useAuth.viewUser/authResolved + ClientOnly page body in layouts/default.vue): now passes, and the page loads with zero console errors and zero Vue hydration warnings.",
+    "cycle_last_executed": 3,
+    "evidence_path": "testcase/evidence/help-ui/FIXED-nav-hydration-clean.png",
+    "status": "PASSED",
+    "test_id": "TC-HELP-50"
+  },
+  "TC-HELP-51": {
+    "actual_result": "'New asset' in the top bar navigates to /assets/new and renders the create form. RETESTED 2026-08-04 after the hydration fix (plugins/hydrated.client.ts + gated useAuth.viewUser/authResolved + ClientOnly page body in layouts/default.vue): now passes, and the page loads with zero console errors and zero Vue hydration warnings.",
+    "cycle_last_executed": 3,
+    "evidence_path": "testcase/evidence/help-ui/FIXED-nav-hydration-clean.png",
+    "status": "PASSED",
+    "test_id": "TC-HELP-51"
+  },
+  "TC-HELP-52": {
+    "actual_result": "Legend 'Fields marked * are required.' present; Asset name and Category both show the asterisk and aria-required semantics via FormField. Note: several other fields the backend treats as required for non-Draft saves (condition, department, location, acquisition type, category-specific attributes) carry no asterisk \u2014 a minor gap in the marking's completeness, not covered by the literal Help wording.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-52"
+  },
+  "TC-HELP-53": {
+    "actual_result": "Submitting the empty form kept the user on /assets/new, focused a role=alert error summary ('Enter an asset name.' / 'Select a category.'), and set aria-invalid on the offending inputs.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-53"
+  },
+  "TC-HELP-54": {
+    "actual_result": "Created an asset with the tag field left blank; the app generated tag AST-000001 and navigated to its detail page, which displayed that generated tag.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-54"
+  },
+  "TC-HELP-55": {
+    "actual_result": "Created an asset with tag explicitly set to QA-HELP-EXPLICIT-01; the saved asset's tag was exactly that value (detail page title 'QA-HELP-EXPLICIT-01 \u00b7 ...'), not overwritten by a generated one.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-55"
+  },
+  "TC-HELP-56": {
+    "actual_result": "Entering an existing serial number (SN200000) plus manufacturer/model still correctly blocks the first save, and the warning now reads as human text: \"1 active asset(s) already use serial number 'SN200000'.\" plus a second rule \"5 active asset(s) share manufacturer 'Acme' and model 'Model-0'.\" -- previously both rendered as the literal string '[object Object]'. FIXED 2026-08-04: the frontend typed the duplicate-check response as {warnings: string[], candidates: DuplicateCandidate[]}, but the backend returns {warnings: [{code, message, matches}]} with no top-level `candidates` key. Retyped to DuplicateWarning/DuplicateMatch and rewrote AssetDuplicatePanel to render each rule's message with its own matches nested under it.",
+    "cycle_last_executed": 3,
+    "evidence_path": "testcase/evidence/help-ui/FIXED-56-58-duplicate-panel.png",
+    "status": "PASSED",
+    "test_id": "TC-HELP-56"
+  },
+  "TC-HELP-57": {
+    "actual_result": "Once the duplicate panel appeared, the submit button label changed from 'Save asset' to 'Save asset anyway', and the 'if none of these are the same...' helper text was shown.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-57"
+  },
+  "TC-HELP-58": {
+    "actual_result": "The panel now lists candidates: each of the 2 matched rules renders as its own section with its message and only the assets that rule matched (serial rule -> AST-100001; manufacturer+model rule -> AST-100001/100008/100015/100022/100029). Every entry shows a monospace tag link and a 'Review' link to /assets/<uuid>, opening in a new tab with an sr-only label so the form's entered values are kept. Previously no candidate list rendered at all because the code read a `candidates` key the API never sends (matches are nested inside warnings[].matches). FIXED 2026-08-04: the frontend typed the duplicate-check response as {warnings: string[], candidates: DuplicateCandidate[]}, but the backend returns {warnings: [{code, message, matches}]} with no top-level `candidates` key. Retyped to DuplicateWarning/DuplicateMatch and rewrote AssetDuplicatePanel to render each rule's message with its own matches nested under it.",
+    "cycle_last_executed": 3,
+    "evidence_path": "testcase/evidence/help-ui/FIXED-56-58-duplicate-panel.png",
+    "status": "PASSED",
+    "test_id": "TC-HELP-58"
+  },
+  "TC-HELP-59": {
+    "actual_result": "Clicking 'Save asset anyway' completed the save; navigated to /assets/<uuid> for the new asset (AST-000002) with a matching detail-page title.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-59"
+  },
+  "TC-HELP-60": {
+    "actual_result": "Editing the serial number to a unique value cleared the duplicate panel and reverted the submit label to 'Save asset', confirming the pre-check re-arms on identity-field changes.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-60"
+  },
+  "TC-HELP-61": {
+    "actual_result": "With the Asset name field dirty, clicking the Assets sidebar link was intercepted by a 'Discard unsaved changes?' dialog (Keep editing / Discard changes); navigating via the browser also triggered the native beforeunload prompt.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-61"
+  },
+  "TC-HELP-65": {
+    "actual_result": "Edit form for AST-000001 prefilled Asset name ('QA Help Autotag 20260804') and category-attribute RAM (16) matching the detail page.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-65"
+  },
+  "TC-HELP-66": {
+    "actual_result": "Applied a concurrent PATCH via API (If-Match matching the form's loaded version) while the edit form stayed open; submitting the stale form then showed a focused alert 'This asset was changed by someone else' with a 'Reload latest data' button and a support correlation id; the stale write was rejected (409-class VERSION_CONFLICT), not silently overwritten.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-66"
+  },
+  "TC-HELP-67": {
+    "actual_result": "Clicking 'Reload latest data' remounted the form showing the concurrent session's description ('Concurrent edit by second session'), discarding the stale local edit; the conflict banner cleared.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-67"
+  },
+  "TC-HELP-68": {
+    "actual_result": "Re-applying the description edit after reload and saving succeeded; GET on the asset afterward showed version incremented to 3 and the re-applied description text.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-68"
+  },
+  "TC-HELP-69": {
+    "actual_result": "Setting warranty end before warranty start and saving produced an inline 'Warranty end must be on or after the start date.' error and aria-invalid on the field; no request completed (stayed on /edit).",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-69"
+  },
+  "TC-HELP-70": {
+    "actual_result": "Signed in as employee: zero elements matched a[href=\"/assets/new\"] anywhere on the asset register page (both header and top-bar entry points absent).",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-70"
+  },
+  "TC-HELP-71": {
+    "actual_result": "Signed in as employee, opened an in-scope (self-custodied) asset: API response for the asset omitted the 'purchase_price' key entirely (not merely blank); no financial section text in the DOM; no edit affordance present.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-71"
+  },
+  "TC-HELP-72": {
+    "actual_result": "Direct navigation to /assets/new as employee rendered a 'You cannot register assets' alert instead of the form; a direct POST to /api/v1/assets/ (bypassing the UI) returned 403 PERMISSION_DENIED and created nothing.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-72"
+  },
+  "TC-HELP-73": {
+    "actual_result": "Signed in as auditor on a seeded asset: full 'Financial and warranty' section rendered (Purchase price, Supplier, warranty dates) including a positive control asset; no edit link present; direct navigation to the edit URL showed 'You cannot edit assets' instead of the form.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-73"
+  },
+  "TC-HELP-74": {
+    "actual_result": "Throughout the admin session (all prior groups): 'New asset' was present in both header and top bar, and the Financial and warranty fieldset (with editable Purchase price) rendered on the create form and detail pages \u2014 positive control confirming the employee/auditor restrictions are role-driven.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-74"
+  },
+  "TC-HELP-75": {
+    "actual_result": "Signed in as employee: zero a[href=\"/admin\"] nav items present; direct navigation to /admin/users showed 'Restricted module \u2014 Administration is limited to system administrators.'; direct GET /api/v1/admin/users/ returned 403 PERMISSION_DENIED.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-75"
+  },
+  "TC-HELP-76": {
+    "actual_result": "Signed in as employee, navigated directly to an out-of-scope asset's UUID (department matched but custodian did not \u2014 employee's effective scope is self-custodied assets, not full department): page showed 'Asset not found \u2014 This asset does not exist or is outside your organizational scope.', no asset data leaked. Note: this specific screen's wording does not include the literal 'contact an administrator' phrase the Help page promises site-wide \u2014 worth a copy-consistency follow-up, not a security defect.",
+    "cycle_last_executed": 3,
+    "evidence_path": "testcase/evidence/help-ui/TC-HELP-76-out-of-scope-asset.png",
+    "status": "PASSED",
+    "test_id": "TC-HELP-76"
+  },
+  "TC-HELP-77": {
+    "actual_result": "Could not construct a reliable 403-on-list scenario in this session: filtering the employee's asset list by an out-of-scope department parameter returned 200 with a correctly-scoped (intersected) result set rather than a 403, so the specific 'forbidden list response' UI path (InlineAlert 'You do not have access to these assets') was not exercised.",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "BLOCKED",
+    "test_id": "TC-HELP-77"
+  },
+  "TC-HELP-78": {
+    "actual_result": "Cleared the session server-side then reloaded a filtered /assets URL: redirected to /login?next=/assets?category=..., preserving the return path; signing back in landed on the original filtered URL. Note: this exercised the unauthenticated-redirect path (fresh SSR) rather than a true mid-session 401 interception, so the 'reason=expired' banner text specifically was not independently re-confirmed in this run (auth.spec.ts already covers the equivalent next= behavior).",
+    "cycle_last_executed": 3,
+    "evidence_path": "MCP Playwright session against https://inventory.praponb.com (2026-08-04), see testcase/help-ui-mcp-run-guide.md",
+    "status": "PASSED",
+    "test_id": "TC-HELP-78"
+  },
   "TC-LAY-001": {
     "actual_result": "App-shell navigation requires browser (final attempt \u2014 environment unchanged).",
     "cycle_last_executed": 3,

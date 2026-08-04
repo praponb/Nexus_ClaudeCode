@@ -5,7 +5,9 @@ import AssetSearch from '~/components/search/AssetSearch.vue'
 const emit = defineEmits<{ (e: 'openDrawer' | 'toggleSidebar'): void }>()
 
 const route = useRoute()
-const { user, logout } = useAuth()
+// `viewUser` (not `user`) so the header renders identically on the server and
+// on the first client render -- see useAuth.
+const { viewUser: user, logout } = useAuth()
 const { canManageAssets } = usePermissions()
 
 const profileOpen = ref(false)

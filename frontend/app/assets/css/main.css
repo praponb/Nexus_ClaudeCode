@@ -43,6 +43,15 @@
     @apply bg-canvas text-ink font-sans antialiased;
   }
 
+  /* The Nuxt mount point must always be a full-viewport block so layout roots
+     stretch instead of shrink-wrapping to their content (auth layout centering). */
+  #__nuxt {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 100dvh;
+  }
+
   ::selection {
     background-color: color-mix(in srgb, var(--color-accent) 35%, transparent);
   }

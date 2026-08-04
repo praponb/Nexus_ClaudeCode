@@ -35,3 +35,7 @@ htmlcov/
 # Orchestrator run artifacts (generated at run time, not source)
 runs/*
 !runs/.gitkeep
+
+# Playwright MCP session artifacts (snapshots/screenshots written by the
+# Playwright MCP server during interactive debugging, not test output)
+.playwright-mcp/

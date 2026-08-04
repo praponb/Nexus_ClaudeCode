@@ -1,0 +1,1238 @@
+[
+  {
+    "test_id": "TC-HELP-01",
+    "requirement_ids": [
+      "LAY-1",
+      "LAY-2"
+    ],
+    "title": "Help page reachable from the sidebar and renders its header",
+    "objective": "Help copy: page header \"Help / How to work with the asset register.\" -- verify the documentation entry point exists and is reachable from primary navigation.",
+    "priority": "Medium",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "n/a",
+    "steps": [
+      "Open http://localhost:3000/.",
+      "Click the \"Help\" item in the left sidebar navigation.",
+      "Inspect the URL, the H1 and the description paragraph."
+    ],
+    "expected_result": "URL is /help; H1 reads \"Help\"; the description reads \"How to work with the asset register.\"; the sidebar \"Help\" item is rendered in the current/active state.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-02",
+    "requirement_ids": [
+      "LAY-1"
+    ],
+    "title": "Help page reachable from the top-bar help icon",
+    "objective": "Help copy: the whole page -- verify the second documented entry point (top-bar icon, aria-label \"Help\") reaches the same page.",
+    "priority": "Low",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "n/a",
+    "steps": [
+      "Open http://localhost:3000/assets at a viewport of 1440x900.",
+      "Activate the top-bar control with accessible name \"Help\"."
+    ],
+    "expected_result": "Navigation lands on /help with the H1 \"Help\" visible; no full page reload is required.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-03",
+    "requirement_ids": [
+      "LAY-2",
+      "NFR-003"
+    ],
+    "title": "Help page exposes three labelled sections",
+    "objective": "Help copy: section headings \"Finding assets\", \"Registering and editing assets\", \"Access and visibility\" -- verify all three render and are programmatically labelled.",
+    "priority": "Medium",
+    "type": "UI/Accessibility",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "n/a",
+    "steps": [
+      "Open http://localhost:3000/help.",
+      "Capture the accessibility snapshot of the main region.",
+      "For each section element, read its aria-labelledby target and the referenced H2 text."
+    ],
+    "expected_result": "Exactly three sections are present, in order, with H2 text \"Finding assets\", \"Registering and editing assets\", \"Access and visibility\"; each section's aria-labelledby resolves to its own H2 (help-search / help-register / help-access).",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-04",
+    "requirement_ids": [
+      "LAY-2"
+    ],
+    "title": "Help body copy matches the shipped strings verbatim (documentation drift guard)",
+    "objective": "Help copy: all eight bullets and the Access paragraph -- verify the rendered text still matches the strings this suite is written against, so a copy change forces a test review.",
+    "priority": "High",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "Expected strings are the eight <li> items and the Access paragraph in frontend/app/pages/help.vue.",
+    "steps": [
+      "Open http://localhost:3000/help.",
+      "Extract the text content of every list item in the three sections plus the Access-and-visibility paragraph.",
+      "Compare against the expected strings recorded with this case."
+    ],
+    "expected_result": "Every rendered string matches its expected value exactly (whitespace-normalised). Any mismatch fails this case and requires the affected TC-HELP-* cases to be re-reviewed before they are executed.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-05",
+    "requirement_ids": [
+      "NFR-003",
+      "LAY-7"
+    ],
+    "title": "Help page passes an automated accessibility scan",
+    "objective": "Help copy: the whole page -- documentation must itself be accessible; verify no serious or critical axe violations and a correct heading hierarchy.",
+    "priority": "Medium",
+    "type": "UI/Accessibility",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "axe-core ruleset: wcag2a, wcag2aa",
+    "steps": [
+      "Open http://localhost:3000/help.",
+      "Run an axe scan scoped to the document.",
+      "Read back the heading levels in DOM order."
+    ],
+    "expected_result": "Zero violations at serious or critical impact; headings are h1 followed by three h2s with no skipped levels; every list is a real ul/li.",
+    "status": "BLOCKED",
+    "automation_status": "automatable (Playwright + axe)"
+  },
+  {
+    "test_id": "TC-HELP-06",
+    "requirement_ids": [
+      "NFR-002",
+      "LAY-3"
+    ],
+    "title": "Help page is readable at mobile width with no horizontal scroll",
+    "objective": "Help copy: the whole page -- verify the guidance is usable on the mobile breakpoint the app claims to support.",
+    "priority": "Medium",
+    "type": "UI/Responsive",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "Viewport 375x812",
+    "steps": [
+      "Resize the viewport to 375x812.",
+      "Open http://localhost:3000/help.",
+      "Compare document.scrollWidth with window.innerWidth and read the visible text."
+    ],
+    "expected_result": "scrollWidth is not greater than innerWidth (no horizontal scrolling); all three section headings and their body copy remain visible and legible; no text is clipped.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-10",
+    "requirement_ids": [
+      "FR-005",
+      "NFR-003"
+    ],
+    "title": "Global search box is present in the top bar with an accessible label",
+    "objective": "Help copy: \"Use the global search in the top bar to search by asset tag, serial number, name, model, custodian, or location.\" -- verify the control exists and its accessible name names those fields.",
+    "priority": "High",
+    "type": "UI/Accessibility",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "n/a",
+    "steps": [
+      "Open http://localhost:3000/ at 1440x900.",
+      "Locate the combobox in the top bar and read its accessible name and ARIA attributes."
+    ],
+    "expected_result": "A role=\"combobox\" input is present in the top bar with accessible name \"Search assets by tag, serial, name, model, custodian, or location\", aria-autocomplete=\"list\" and aria-expanded=\"false\" while closed.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-11",
+    "requirement_ids": [
+      "FR-005"
+    ],
+    "title": "Single-character input does not open the suggestion list",
+    "objective": "Help copy: \"Use the global search in the top bar...\" -- verify the minimum-length gate so the listbox does not flicker open on the first keystroke.",
+    "priority": "Low",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "Query: \"L\"",
+    "steps": [
+      "Open http://localhost:3000/.",
+      "Type a single character into the global search box and wait 1 second."
+    ],
+    "expected_result": "No listbox is rendered; aria-expanded stays \"false\"; no search request is issued.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-12",
+    "requirement_ids": [
+      "FR-005"
+    ],
+    "title": "Global search finds an asset by asset tag",
+    "objective": "Help copy: \"...search by asset tag...\" -- verify the tag field is searchable from the top bar.",
+    "priority": "Critical",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "Tag of a seeded asset, read from the first row of /assets.",
+    "steps": [
+      "Open http://localhost:3000/assets and copy the tag shown in the first table row.",
+      "Open http://localhost:3000/.",
+      "Type the tag into the global search box and wait for suggestions."
+    ],
+    "expected_result": "The suggestion listbox opens and contains an option whose monospace tag text equals the searched tag, together with that asset's name.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-13",
+    "requirement_ids": [
+      "FR-005"
+    ],
+    "title": "Exact tag match is ranked first among multiple hits",
+    "objective": "Help copy: \"Exact tag matches appear first.\" -- verify ranking, not just retrieval.",
+    "priority": "Critical",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "A tag value that is also a strict prefix of at least one other asset tag (for example AST-0001 alongside AST-00010); confirm via GET /api/v1/assets?q=<prefix> before running.",
+    "steps": [
+      "Identify a tag T that is both an exact tag of one asset and a prefix of other tags.",
+      "Open http://localhost:3000/ and type T into the global search box.",
+      "Wait for the listbox and read the options in order."
+    ],
+    "expected_result": "The first option in the listbox is the asset whose tag equals T exactly; partial/prefix matches follow it. Ranking is stable across repeated runs.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-14",
+    "requirement_ids": [
+      "FR-005"
+    ],
+    "title": "Global search finds an asset by serial number",
+    "objective": "Help copy: \"...search by asset tag, serial number, name, model, custodian, or location.\" -- verify the serial number field is actually searchable.",
+    "priority": "High",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "Search term: serial_number of a seeded asset (read from the asset detail page or the list API first).",
+    "steps": [
+      "Read a known serial number value from a seeded asset.",
+      "Open http://localhost:3000/ and type that value into the global search box.",
+      "Wait for the suggestion listbox."
+    ],
+    "expected_result": "The listbox opens with at least one option, and the expected asset (matched by tag) is among the returned options -- proving serial number participates in the search index.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-15",
+    "requirement_ids": [
+      "FR-005"
+    ],
+    "title": "Global search finds an asset by name",
+    "objective": "Help copy: \"...search by asset tag, serial number, name, model, custodian, or location.\" -- verify the name field is actually searchable.",
+    "priority": "High",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "Search term: a distinctive word from a seeded asset name (read from the asset detail page or the list API first).",
+    "steps": [
+      "Read a known name value from a seeded asset.",
+      "Open http://localhost:3000/ and type that value into the global search box.",
+      "Wait for the suggestion listbox."
+    ],
+    "expected_result": "The listbox opens with at least one option, and the expected asset (matched by tag) is among the returned options -- proving name participates in the search index.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-16",
+    "requirement_ids": [
+      "FR-005"
+    ],
+    "title": "Global search finds an asset by model",
+    "objective": "Help copy: \"...search by asset tag, serial number, name, model, custodian, or location.\" -- verify the model field is actually searchable.",
+    "priority": "High",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "Search term: model of a seeded asset (read from the asset detail page or the list API first).",
+    "steps": [
+      "Read a known model value from a seeded asset.",
+      "Open http://localhost:3000/ and type that value into the global search box.",
+      "Wait for the suggestion listbox."
+    ],
+    "expected_result": "The listbox opens with at least one option, and the expected asset (matched by tag) is among the returned options -- proving model participates in the search index.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-17",
+    "requirement_ids": [
+      "FR-005"
+    ],
+    "title": "Global search finds an asset by custodian",
+    "objective": "Help copy: \"...search by asset tag, serial number, name, model, custodian, or location.\" -- verify the custodian field is actually searchable.",
+    "priority": "High",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "Search term: display name of a seeded custodian (read from the asset detail page or the list API first).",
+    "steps": [
+      "Read a known custodian value from a seeded asset.",
+      "Open http://localhost:3000/ and type that value into the global search box.",
+      "Wait for the suggestion listbox."
+    ],
+    "expected_result": "The listbox opens with at least one option, and the expected asset (matched by tag) is among the returned options -- proving custodian participates in the search index.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-18",
+    "requirement_ids": [
+      "FR-005"
+    ],
+    "title": "Global search finds an asset by location",
+    "objective": "Help copy: \"...search by asset tag, serial number, name, model, custodian, or location.\" -- verify the location field is actually searchable.",
+    "priority": "High",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "Search term: name of a seeded location (read from the asset detail page or the list API first).",
+    "steps": [
+      "Read a known location value from a seeded asset.",
+      "Open http://localhost:3000/ and type that value into the global search box.",
+      "Wait for the suggestion listbox."
+    ],
+    "expected_result": "The listbox opens with at least one option, and the expected asset (matched by tag) is among the returned options -- proving location participates in the search index.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-19",
+    "requirement_ids": [
+      "FR-005"
+    ],
+    "title": "Choosing a suggestion opens that asset's detail page",
+    "objective": "Help copy: \"Use the global search in the top bar...\" -- verify the suggestion is actionable, not decorative.",
+    "priority": "Critical",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "Tag of a seeded asset.",
+    "steps": [
+      "Open http://localhost:3000/ and search for a known tag.",
+      "Click the first suggestion."
+    ],
+    "expected_result": "Navigation lands on /assets/<uuid> for the chosen asset; the detail heading shows that asset's name; the search box is cleared and the listbox closed.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-20",
+    "requirement_ids": [
+      "FR-005"
+    ],
+    "title": "Pressing Enter without a highlighted suggestion runs a full search",
+    "objective": "Help copy: \"Use the global search in the top bar...\" -- verify the fallback path from the quick search into the full asset register.",
+    "priority": "High",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "Query: \"laptop\"",
+    "steps": [
+      "Open http://localhost:3000/.",
+      "Type a multi-result term into the global search box.",
+      "Press Enter without arrowing into the suggestion list."
+    ],
+    "expected_result": "Navigation lands on /assets?q=<term>; the register shows the matching results and a chip labelled Search: \"<term>\".",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-21",
+    "requirement_ids": [
+      "FR-005",
+      "NFR-003"
+    ],
+    "title": "Suggestion list is fully keyboard navigable",
+    "objective": "Help copy: \"Use the global search in the top bar...\" -- verify keyboard parity with the mouse path (WCAG 2.1.1).",
+    "priority": "High",
+    "type": "UI/Accessibility",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "A term returning at least two suggestions.",
+    "steps": [
+      "Focus the global search box using Tab only.",
+      "Type a term returning multiple suggestions.",
+      "Press ArrowDown twice, then ArrowUp once, reading aria-activedescendant each time.",
+      "Press Enter.",
+      "Return to the search box, retype the term, and press Escape."
+    ],
+    "expected_result": "ArrowDown/ArrowUp move aria-activedescendant through the options and wrap at the ends; the highlighted option has aria-selected=\"true\"; Enter opens that asset; Escape closes the listbox and leaves focus in the input.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-22",
+    "requirement_ids": [
+      "FR-005"
+    ],
+    "title": "Search with no matches shows the documented empty message",
+    "objective": "Help copy: \"Use the global search in the top bar...\" -- verify the no-result state is explicit rather than an empty dropdown.",
+    "priority": "Medium",
+    "type": "UI/Negative",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "Query: \"zzzz-no-such-asset-zzzz\"",
+    "steps": [
+      "Open http://localhost:3000/.",
+      "Type a term that cannot match any asset and wait for the request to settle."
+    ],
+    "expected_result": "The dropdown opens showing \"No assets match this search.\" and no options; no error toast is raised.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-23",
+    "requirement_ids": [
+      "FR-005",
+      "NFR-003"
+    ],
+    "title": "Search result count is announced to assistive technology",
+    "objective": "Help copy: \"Use the global search in the top bar...\" -- verify screen-reader users learn the outcome of a search.",
+    "priority": "Medium",
+    "type": "UI/Accessibility",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "Query returning a known number of results.",
+    "steps": [
+      "Open http://localhost:3000/ and search for a term with matches.",
+      "Read the text of the role=\"status\" region next to the search box.",
+      "Repeat with a term that has no matches."
+    ],
+    "expected_result": "The status region reads \"N result(s) available.\" for matches and \"No assets match this search.\" for none; it is sr-only (not visually rendered) and is updated, not duplicated.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-30",
+    "requirement_ids": [
+      "FR-005"
+    ],
+    "title": "Each documented filter dimension narrows the register",
+    "objective": "Help copy: \"On the asset register, combine filters (status, condition, category, department, location).\" -- verify all five dimensions exist and filter.",
+    "priority": "Critical",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "One valid value per dimension, taken from the select options themselves.",
+    "steps": [
+      "Open http://localhost:3000/assets at 1440x900 and record the baseline result count.",
+      "For each of status, condition, category, department and location: select a value, wait for the list to settle, record the count, then clear it again."
+    ],
+    "expected_result": "All five controls are present and labelled; each selection produces a result count less than or equal to the baseline and a URL query parameter of the same name; clearing it restores the baseline count.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-31",
+    "requirement_ids": [
+      "FR-005"
+    ],
+    "title": "Filters combine (AND), not replace",
+    "objective": "Help copy: \"combine filters (status, condition, category, department, location)\" -- verify combined filters intersect.",
+    "priority": "Critical",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "Two dimensions with values that individually match rows.",
+    "steps": [
+      "Open http://localhost:3000/assets.",
+      "Apply filter A and record count(A).",
+      "Without clearing A, apply filter B and record count(A+B).",
+      "Inspect the URL query string."
+    ],
+    "expected_result": "count(A+B) is less than or equal to both count(A) and count(B); the URL carries both parameters; every visible row satisfies both filters.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-32",
+    "requirement_ids": [
+      "FR-005"
+    ],
+    "title": "Active filters render as labelled chips",
+    "objective": "Help copy: \"Active filters appear as removable chips...\" -- verify each active dimension produces one chip with a human-readable label.",
+    "priority": "High",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "Status + category filters applied.",
+    "steps": [
+      "Open http://localhost:3000/assets and apply a status and a category filter.",
+      "Read the contents of the \"Active filters\" group."
+    ],
+    "expected_result": "One chip per active dimension, labelled \"Status: <label>\" and \"Category: <name>\" using the reference-data display names (not raw UUIDs); a free-text search renders as Search: \"<term>\"; each chip has a remove button named \"Remove filter <label>\".",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-33",
+    "requirement_ids": [
+      "FR-005"
+    ],
+    "title": "Removing a chip clears only that filter",
+    "objective": "Help copy: \"Active filters appear as removable chips...\" -- verify \"removable\" and that removal is surgical.",
+    "priority": "High",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "Two filters applied simultaneously.",
+    "steps": [
+      "Open http://localhost:3000/assets and apply two filters.",
+      "Activate the remove button on the first chip.",
+      "Inspect the remaining chips, the URL and the result count."
+    ],
+    "expected_result": "Only the removed dimension disappears from the chips and from the URL; the other filter stays applied and its chip remains; the result count widens to the single-filter count.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-34",
+    "requirement_ids": [
+      "FR-005"
+    ],
+    "title": "\"Clear all\" resets every filter and the URL",
+    "objective": "Help copy: \"Active filters appear as removable chips and the URL stays shareable.\" -- verify the bulk reset returns to a clean, shareable base URL.",
+    "priority": "High",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "Three filters plus a search term applied.",
+    "steps": [
+      "Open http://localhost:3000/assets and apply three filters plus a text search.",
+      "Activate \"Clear all\"."
+    ],
+    "expected_result": "All chips disappear; the URL returns to /assets with no query string; the result count returns to the unfiltered total.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-35",
+    "requirement_ids": [
+      "FR-005"
+    ],
+    "title": "Filtered URL is shareable and restores identical state",
+    "objective": "Help copy: \"...and the URL stays shareable.\" -- verify the strongest claim on the page: a copied URL reproduces the same view for the recipient.",
+    "priority": "Critical",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "Two filters + ordering + page 2.",
+    "steps": [
+      "Open http://localhost:3000/assets, apply two filters, change the sort, and go to page 2.",
+      "Copy the full URL and record the chips, sort indicator and result count.",
+      "Open the copied URL in a new browser tab (fresh page load, same session)."
+    ],
+    "expected_result": "The freshly loaded page shows the same chips, the same sort column and direction, the same page number and the same result count -- no state is held only in memory.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-36",
+    "requirement_ids": [
+      "FR-005"
+    ],
+    "title": "Changing a filter resets pagination to page 1",
+    "objective": "Help copy: \"combine filters...\" -- verify a narrowed result set cannot strand the user on an out-of-range page.",
+    "priority": "Medium",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "A filter that reduces the result set below one page.",
+    "steps": [
+      "Open http://localhost:3000/assets and navigate to page 3.",
+      "Apply a filter that reduces the total below one page of results."
+    ],
+    "expected_result": "The URL drops the page parameter (page 1); results are shown rather than an empty page; pagination controls reflect the new total.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-37",
+    "requirement_ids": [
+      "FR-005"
+    ],
+    "title": "Register text filter debounces into the q parameter",
+    "objective": "Help copy: \"On the asset register, combine filters...\" -- verify the in-page text filter behaves as a filter dimension.",
+    "priority": "Medium",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "Term: a distinctive substring of a seeded asset name.",
+    "steps": [
+      "Open http://localhost:3000/assets.",
+      "Type a term into the \"Filter by tag, serial, name...\" box and wait ~500ms."
+    ],
+    "expected_result": "Exactly one list request is issued after typing stops; the URL gains q=<term>; a Search: \"<term>\" chip appears; results narrow accordingly.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-38",
+    "requirement_ids": [
+      "FR-005",
+      "LAY-4"
+    ],
+    "title": "Over-filtered register shows a recoverable empty state",
+    "objective": "Help copy: \"combine filters...\" -- verify a dead-end combination offers a way out.",
+    "priority": "Medium",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "A filter combination guaranteed to match nothing.",
+    "steps": [
+      "Open http://localhost:3000/assets and apply a combination that matches no assets.",
+      "Read the empty state, then activate \"Clear all filters\"."
+    ],
+    "expected_result": "The empty state reads \"No assets match your filters\" with guidance to broaden the search; the \"Clear all filters\" button restores the unfiltered list.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-39",
+    "requirement_ids": [
+      "FR-005",
+      "NFR-002"
+    ],
+    "title": "Mobile filter drawer exposes the active filter count",
+    "objective": "Help copy: \"combine filters...\" -- verify filters remain reachable and their state visible below the lg breakpoint.",
+    "priority": "Medium",
+    "type": "UI/Responsive",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "Viewport 375x812; two filters applied.",
+    "steps": [
+      "Resize the viewport to 375x812 and open http://localhost:3000/assets.",
+      "Apply two filters via the Filters drawer, then close it.",
+      "Read the Filters button's badge and accessible name."
+    ],
+    "expected_result": "The Filters button shows a badge reading \"2\" and an accessible name of \"Open filters, 2 active\"; the chips remain visible; the drawer applies and clears filters correctly.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-40",
+    "requirement_ids": [
+      "FR-006"
+    ],
+    "title": "Save the current filter combination as a saved view",
+    "objective": "Help copy: \"Save frequently used filter combinations as a saved view.\" -- verify the primary save path.",
+    "priority": "Critical",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "View name: \"QA Help Suite View <timestamp>\"",
+    "steps": [
+      "Open http://localhost:3000/assets and apply at least two filters.",
+      "Activate \"Save current view\", enter a unique name, and activate \"Save view\".",
+      "Inspect the saved-view select."
+    ],
+    "expected_result": "The name form closes; the new view appears as an option in the Saved view select and is the selected option; a \"Delete view\" button becomes available.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-41",
+    "requirement_ids": [
+      "FR-006",
+      "FR-005"
+    ],
+    "title": "Applying a saved view restores its filters and results",
+    "objective": "Help copy: \"Save frequently used filter combinations as a saved view.\" -- verify the saved combination is actually replayable.",
+    "priority": "Critical",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "The view created in TC-HELP-40.",
+    "steps": [
+      "Open http://localhost:3000/assets and clear all filters (URL is bare /assets).",
+      "Select the saved view from the Saved view select."
+    ],
+    "expected_result": "The URL is rewritten with the saved view's query parameters; the same chips reappear; the result count matches the count recorded when the view was saved.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-42",
+    "requirement_ids": [
+      "FR-006"
+    ],
+    "title": "Deleting a saved view removes it from the list",
+    "objective": "Help copy: \"Save frequently used filter combinations as a saved view.\" -- verify the lifecycle closes cleanly (also the teardown for this suite).",
+    "priority": "High",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "The view created in TC-HELP-40.",
+    "steps": [
+      "Open http://localhost:3000/assets and select the saved view.",
+      "Activate \"Delete view\".",
+      "Reload the page and reopen the select."
+    ],
+    "expected_result": "The view is gone from the select, the selection returns to \"None\", the \"Delete view\" button disappears, and the removal survives a reload.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-43",
+    "requirement_ids": [
+      "FR-006"
+    ],
+    "title": "A saved view cannot be created without a name",
+    "objective": "Help copy: \"Save frequently used filter combinations as a saved view.\" -- verify the guard against unnamed views.",
+    "priority": "Low",
+    "type": "UI/Negative",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "Name inputs: \"\" and \"   \"",
+    "steps": [
+      "Open http://localhost:3000/assets and activate \"Save current view\".",
+      "Leave the name empty, then enter only spaces."
+    ],
+    "expected_result": "The \"Save view\" button stays disabled in both cases; pressing Enter in the name field does not create a view; no request is sent.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-44",
+    "requirement_ids": [
+      "FR-006"
+    ],
+    "title": "Saved views persist across reload and re-authentication",
+    "objective": "Help copy: \"Save frequently used filter combinations as a saved view.\" -- verify views are server-side, not per-tab state.",
+    "priority": "High",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "A saved view created earlier in the run.",
+    "steps": [
+      "Create a saved view, then reload the page and confirm it is listed.",
+      "Sign out, sign back in as the same user, and open /assets."
+    ],
+    "expected_result": "The saved view is present in the select after both the reload and the re-login, with the same name and the same stored filter configuration.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-45",
+    "requirement_ids": [
+      "FR-006",
+      "FR-002"
+    ],
+    "title": "A saved view is not visible to a different user",
+    "objective": "Help copy: \"Save frequently used filter combinations as a saved view.\" combined with \"What you can see and do depends on your role and organizational scope.\" -- verify owner isolation.",
+    "priority": "High",
+    "type": "UI/Security",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "An admin-owned view created in TC-HELP-40; employee credentials.",
+    "steps": [
+      "As admin, create a uniquely named saved view.",
+      "Sign out and sign in as `employee`.",
+      "Open http://localhost:3000/assets and open the Saved view select."
+    ],
+    "expected_result": "The admin's view is absent from the employee's select (unless explicitly shared, which is labelled \"(shared)\"); no request exposes another user's view configuration.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-50",
+    "requirement_ids": [
+      "FR-003"
+    ],
+    "title": "\"New asset\" is reachable from the asset register",
+    "objective": "Help copy: \"Choose New asset from the register or top bar.\" -- verify the first documented entry point.",
+    "priority": "High",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "n/a",
+    "steps": [
+      "Open http://localhost:3000/assets.",
+      "Activate the \"New asset\" action in the page header."
+    ],
+    "expected_result": "Navigation lands on /assets/new with the create form rendered and the \"Save asset\" button present.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-51",
+    "requirement_ids": [
+      "FR-003"
+    ],
+    "title": "\"New asset\" is reachable from the top bar",
+    "objective": "Help copy: \"Choose New asset from the register or top bar.\" -- verify the second documented entry point.",
+    "priority": "Medium",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "Viewport 1440x900 (the top-bar action is sm and up).",
+    "steps": [
+      "Open http://localhost:3000/ at 1440x900.",
+      "Activate the \"New asset\" link in the top bar."
+    ],
+    "expected_result": "Navigation lands on /assets/new with the create form rendered.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-52",
+    "requirement_ids": [
+      "FR-003",
+      "NFR-003"
+    ],
+    "title": "Required fields are marked with an asterisk and explained",
+    "objective": "Help copy: \"Required fields are marked with an asterisk.\" -- verify the marking exists and is explained in text, not colour alone.",
+    "priority": "High",
+    "type": "UI/Accessibility",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "n/a",
+    "steps": [
+      "Open http://localhost:3000/assets/new.",
+      "Read the legend above the form and inspect the Asset name and Category fields."
+    ],
+    "expected_result": "The legend reads \"Fields marked * are required.\"; Asset name and Category show the asterisk and carry the required attribute; the asterisk itself is aria-hidden so it is not read as punctuation; optional fields carry no asterisk.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-53",
+    "requirement_ids": [
+      "FR-003",
+      "NFR-003"
+    ],
+    "title": "Submitting with required fields empty shows field errors and keeps the user on the form",
+    "objective": "Help copy: \"Required fields are marked with an asterisk.\" -- verify the marking is enforced.",
+    "priority": "Critical",
+    "type": "UI/Negative",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "Empty form.",
+    "steps": [
+      "Open http://localhost:3000/assets/new.",
+      "Activate \"Save asset\" without filling anything in."
+    ],
+    "expected_result": "An error summary with role=\"alert\" receives focus and lists the failing fields; inline messages read \"Enter an asset name.\" and \"Select a category.\"; the offending inputs get aria-invalid=\"true\"; the URL stays /assets/new and no asset is created.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-54",
+    "requirement_ids": [
+      "FR-003",
+      "BR-001"
+    ],
+    "title": "Leaving the asset tag blank generates a tag automatically",
+    "objective": "Help copy: \"Leave the asset tag blank to have one generated automatically.\" -- verify the generated tag is produced and surfaced.",
+    "priority": "Critical",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "name: \"QA Help Autotag <timestamp>\", category: first option, tag: left empty.",
+    "steps": [
+      "Open http://localhost:3000/assets/new.",
+      "Confirm the Asset tag hint reads \"Leave blank to have a tag generated automatically.\"",
+      "Fill in only Asset name and Category, leaving Asset tag empty.",
+      "Activate \"Save asset\" (and \"Save asset anyway\" if a duplicate panel appears)."
+    ],
+    "expected_result": "The asset is created and the browser lands on /assets/<uuid>; a non-empty tag is shown on the detail page and echoed in the success toast; the tag follows the configured tag format and is unique.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-55",
+    "requirement_ids": [
+      "FR-003",
+      "BR-001"
+    ],
+    "title": "An explicitly entered asset tag is used as typed",
+    "objective": "Help copy: \"Leave the asset tag blank to have one generated automatically.\" -- verify the converse: a supplied tag is honoured, not overwritten.",
+    "priority": "High",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "tag: \"QA-HELP-<timestamp>\", plus name and category.",
+    "steps": [
+      "Open http://localhost:3000/assets/new.",
+      "Enter a unique tag along with Asset name and Category.",
+      "Save the asset."
+    ],
+    "expected_result": "The created asset's tag on the detail page is exactly the value entered; no generated tag replaces it.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-56",
+    "requirement_ids": [
+      "FR-003"
+    ],
+    "title": "Possible duplicates are reported before the first save",
+    "objective": "Help copy: \"Before saving, the app warns you about possible duplicates...\" -- verify the pre-check fires and blocks the first save attempt.",
+    "priority": "Critical",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "serial_number / manufacturer / model copied from an existing seeded asset.",
+    "steps": [
+      "Read the serial number, manufacturer and model of an existing asset.",
+      "Open http://localhost:3000/assets/new and enter a new name, a category, and those same identity values.",
+      "Activate \"Save asset\"."
+    ],
+    "expected_result": "A warning panel titled \"Possible duplicate assets\" appears and receives focus; the asset is NOT created by this first click (verify no navigation and no new record via the list afterwards).",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-57",
+    "requirement_ids": [
+      "FR-003"
+    ],
+    "title": "Submit label changes to \"Save asset anyway\" after a duplicate warning",
+    "objective": "Help copy: \"...review them, then save anyway if the asset is genuinely new.\" -- verify the documented affordance appears verbatim.",
+    "priority": "High",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "State carried over from TC-HELP-56.",
+    "steps": [
+      "Trigger the duplicate warning as in TC-HELP-56.",
+      "Read the submit button label and the helper text under the panel."
+    ],
+    "expected_result": "The submit button now reads \"Save asset anyway\"; the helper text reads \"If none of these are the same physical asset, choose “Save asset anyway” to continue.\"",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-58",
+    "requirement_ids": [
+      "FR-003"
+    ],
+    "title": "Duplicate panel lists reviewable candidates",
+    "objective": "Help copy: \"...the app warns you about possible duplicates -- review them...\" -- verify the candidates are inspectable, which is what makes review possible.",
+    "priority": "High",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "State carried over from TC-HELP-56.",
+    "steps": [
+      "Trigger the duplicate warning as in TC-HELP-56.",
+      "Inspect each candidate entry in the panel.",
+      "Activate a candidate's \"Review\" link in a new tab."
+    ],
+    "expected_result": "Each candidate shows its tag (as a link), its name and its match reasons; the Review link opens /assets/<uuid> for that candidate; the create form retains its entered values.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-59",
+    "requirement_ids": [
+      "FR-003"
+    ],
+    "title": "\"Save asset anyway\" completes the registration",
+    "objective": "Help copy: \"...then save anyway if the asset is genuinely new.\" -- verify the override actually saves.",
+    "priority": "Critical",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "State carried over from TC-HELP-56.",
+    "steps": [
+      "Trigger the duplicate warning as in TC-HELP-56.",
+      "Activate \"Save asset anyway\"."
+    ],
+    "expected_result": "The asset is created, the browser lands on /assets/<uuid>, a success toast names the new tag, and the new asset appears in the register.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-60",
+    "requirement_ids": [
+      "FR-003"
+    ],
+    "title": "Editing identity fields re-arms the duplicate pre-check",
+    "objective": "Help copy: \"Before saving, the app warns you about possible duplicates...\" -- verify the acknowledgement does not persist after the identity data changes.",
+    "priority": "Medium",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "State carried over from TC-HELP-56.",
+    "steps": [
+      "Trigger the duplicate warning as in TC-HELP-56.",
+      "Change the serial number to a new unique value.",
+      "Read the submit button label and check whether the panel is still shown."
+    ],
+    "expected_result": "The duplicate panel is cleared and the submit label reverts to \"Save asset\"; the next save runs a fresh duplicate pre-check against the new values.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-61",
+    "requirement_ids": [
+      "FR-003",
+      "LAY-4"
+    ],
+    "title": "Leaving a dirty create form asks for confirmation",
+    "objective": "Help copy: \"Choose New asset...\" -- verify entered work is not silently lost, which the registration guidance implicitly relies on.",
+    "priority": "Medium",
+    "type": "UI/Usability",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "Partially filled create form.",
+    "steps": [
+      "Open http://localhost:3000/assets/new and fill in the Asset name only.",
+      "Attempt to navigate to /assets via the sidebar."
+    ],
+    "expected_result": "Navigation is intercepted and a confirmation dialog is shown; cancelling keeps the form and its values; confirming leaves the page.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-65",
+    "requirement_ids": [
+      "FR-004"
+    ],
+    "title": "Edit form is prefilled with the current asset values",
+    "objective": "Help copy: \"If someone else edits the same asset while you work...\" -- baseline: verify the edit form loads the current version before concurrency is exercised.",
+    "priority": "High",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "Any seeded asset UUID.",
+    "steps": [
+      "Open http://localhost:3000/assets and open the first asset.",
+      "Open its Edit page.",
+      "Compare the form values with the detail page values."
+    ],
+    "expected_result": "The heading reads \"Edit asset\"; name, category, status, condition, department, location and identity fields match the detail page; the submit button reads \"Save changes\".",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-66",
+    "requirement_ids": [
+      "FR-004",
+      "BR-009"
+    ],
+    "title": "A concurrent edit produces the documented conflict prompt",
+    "objective": "Help copy: \"If someone else edits the same asset while you work, you will be asked to reload the latest version before saving again.\" -- verify the core promise.",
+    "priority": "Critical",
+    "type": "UI/Concurrency",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "One asset UUID; a second update applied out-of-band via PATCH /api/v1/assets/<uuid> with the current version and If-Match header (pattern proven in frontend/tests/e2e/assets.spec.ts).",
+    "steps": [
+      "Open the edit page for an asset and leave it open.",
+      "Apply a change to the same asset out-of-band (second session or API call).",
+      "Back in the open form, modify the description and activate \"Save changes\"."
+    ],
+    "expected_result": "A warning alert titled \"This asset was changed by someone else\" is shown and focused, with a message about reloading; a \"Reload latest data\" button is present; the stale save is rejected (HTTP 409 VERSION_CONFLICT) and the other user's change is not overwritten.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-67",
+    "requirement_ids": [
+      "FR-004"
+    ],
+    "title": "\"Reload latest data\" restores the current version into the form",
+    "objective": "Help copy: \"...you will be asked to reload the latest version before saving again.\" -- verify the offered remedy works.",
+    "priority": "Critical",
+    "type": "UI/Concurrency",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "Conflict state from TC-HELP-66.",
+    "steps": [
+      "Reach the conflict state described in TC-HELP-66.",
+      "Activate \"Reload latest data\"."
+    ],
+    "expected_result": "The form remounts showing the other user's saved values (including the concurrent change); the conflict alert is gone; the stale local edit is discarded rather than silently kept.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-68",
+    "requirement_ids": [
+      "FR-004",
+      "BR-009"
+    ],
+    "title": "Re-applying the edit after reloading saves successfully",
+    "objective": "Help copy: \"...before saving again.\" -- verify the user can complete their work after resolving the conflict.",
+    "priority": "High",
+    "type": "UI/Concurrency",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "State from TC-HELP-67.",
+    "steps": [
+      "After reloading the latest data, re-apply the intended change.",
+      "Activate \"Save changes\"."
+    ],
+    "expected_result": "The save succeeds with a success toast; the detail page shows both the concurrent change and the re-applied change; the asset version has incremented; the history records both updates.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-69",
+    "requirement_ids": [
+      "FR-004"
+    ],
+    "title": "Client-side field validation on the edit form",
+    "objective": "Help copy: \"Registering and editing assets\" -- verify edit-time validation behaves like create-time validation.",
+    "priority": "Medium",
+    "type": "UI/Negative",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "warranty_start later than warranty_end; purchase price \"12.345\".",
+    "steps": [
+      "Open the edit page for an asset (as a role that can see financial fields).",
+      "Set a warranty end date earlier than the warranty start date and save.",
+      "Correct the dates, enter an invalid purchase price, and save again."
+    ],
+    "expected_result": "\"Warranty end must be on or after the start date.\" and \"Enter a valid amount, for example 1299.99.\" are shown inline against the right fields; the error summary receives focus; no request is sent for either invalid state.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-70",
+    "requirement_ids": [
+      "FR-002"
+    ],
+    "title": "employee does not see asset-creation actions",
+    "objective": "Help copy: \"What you can see and do depends on your role and organizational scope.\" -- verify a low-privilege role loses the create affordances.",
+    "priority": "Critical",
+    "type": "UI/Security",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `employee` (no finance.view capability, not an asset manager).",
+    "test_data": "n/a",
+    "steps": [
+      "Sign in as `employee` and open http://localhost:3000/assets at 1440x900.",
+      "Look for a \"New asset\" action in the page header and in the top bar."
+    ],
+    "expected_result": "No \"New asset\" control exists in either location; the register itself still renders within the user's scope.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-71",
+    "requirement_ids": [
+      "FR-002"
+    ],
+    "title": "Financial fields are hidden from employee",
+    "objective": "Help copy: \"Financial fields are restricted to authorized roles.\" -- verify the field-level restriction on the read path.",
+    "priority": "Critical",
+    "type": "UI/Security",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `employee` (no finance.view capability, not an asset manager).",
+    "test_data": "An asset with a purchase price set.",
+    "steps": [
+      "Sign in as `employee` and open an asset detail page.",
+      "Search the page for purchase price, purchase date and any currency amounts.",
+      "Inspect the JSON of the underlying GET /api/v1/assets/<uuid> response."
+    ],
+    "expected_result": "No financial section or purchase amount is rendered, and the API response itself omits the restricted fields -- the value is never delivered to the client, not merely hidden by CSS.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-72",
+    "requirement_ids": [
+      "FR-002",
+      "NFR-007"
+    ],
+    "title": "Hidden actions are also refused server-side for employee",
+    "objective": "Help copy: \"If a page or action is hidden, the backend enforces the same restriction.\" -- verify the claim by bypassing the UI.",
+    "priority": "Critical",
+    "type": "UI/Security",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `employee` (no finance.view capability, not an asset manager).",
+    "test_data": "Direct URL /assets/new; direct POST /api/v1/assets.",
+    "steps": [
+      "Sign in as `employee` and navigate directly to http://localhost:3000/assets/new.",
+      "Independently POST a valid asset payload to /api/v1/assets with the employee session and CSRF token."
+    ],
+    "expected_result": "The UI route does not yield a usable create form (403 Access denied or redirect), and the direct API call returns 403 PERMISSION_DENIED with no asset created -- proving the hidden action is a real boundary.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-73",
+    "requirement_ids": [
+      "FR-002"
+    ],
+    "title": "auditor sees financial data but no write actions",
+    "objective": "Help copy: \"Financial fields are restricted to authorized roles.\" -- verify the positive half of the finance rule alongside read-only scope.",
+    "priority": "High",
+    "type": "UI/Security",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `auditor`.",
+    "test_data": "An asset with a purchase price set.",
+    "steps": [
+      "Sign in as `auditor` and open an asset detail page.",
+      "Check for financial fields, and for Edit / New asset actions."
+    ],
+    "expected_result": "Financial fields (purchase price, purchase date) are visible to the auditor; create and edit affordances are absent; direct navigation to an edit URL is refused by the backend.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-74",
+    "requirement_ids": [
+      "FR-002"
+    ],
+    "title": "admin sees both creation actions and financial fields (positive control)",
+    "objective": "Help copy: \"What you can see and do depends on your role...\" -- control case proving the employee/auditor results are role-driven, not global breakage.",
+    "priority": "High",
+    "type": "UI/Functional",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `admin`; reference data and demo assets seeded (scripts/seed-dev.sh).",
+    "test_data": "The same asset used in TC-HELP-71 and TC-HELP-73.",
+    "steps": [
+      "Sign in as `admin` and open the same asset detail page.",
+      "Check for financial fields and for the \"New asset\" action."
+    ],
+    "expected_result": "Financial fields are visible and \"New asset\" is available in both the register header and the top bar; the create form also renders its Financial and warranty fieldset.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-75",
+    "requirement_ids": [
+      "FR-002",
+      "NFR-007"
+    ],
+    "title": "Admin-only areas are hidden and refused for non-admins",
+    "objective": "Help copy: \"If a page or action is hidden, the backend enforces the same restriction...\" -- verify at page granularity, not just per-field.",
+    "priority": "Critical",
+    "type": "UI/Security",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `employee` (no finance.view capability, not an asset manager).",
+    "test_data": "Direct URLs /admin, /admin/users.",
+    "steps": [
+      "Sign in as `employee` and inspect the sidebar for admin entries.",
+      "Navigate directly to http://localhost:3000/admin/users.",
+      "Call the corresponding admin API endpoint with the employee session."
+    ],
+    "expected_result": "No admin navigation entries are rendered; direct navigation shows the 403 \"Access denied\" page rather than admin content; the API returns 403 PERMISSION_DENIED.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-76",
+    "requirement_ids": [
+      "FR-002"
+    ],
+    "title": "Out-of-scope asset access is refused with guidance",
+    "objective": "Help copy: \"...depends on your role and organizational scope... contact an administrator to request changes to your access.\" -- verify scope enforcement and the documented next step.",
+    "priority": "Critical",
+    "type": "UI/Security",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `employee` (no finance.view capability, not an asset manager).",
+    "test_data": "UUID of an asset in a department outside the employee's scope (obtain as admin first).",
+    "steps": [
+      "As admin, note the UUID of an asset outside the employee's department scope.",
+      "Sign in as `employee` and navigate directly to /assets/<that-uuid>."
+    ],
+    "expected_result": "The asset's data is not rendered; a 403 Access denied state is shown whose message points the user to contact an administrator, matching the Help guidance; the underlying API returns 403/404 without leaking field values.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-77",
+    "requirement_ids": [
+      "FR-002",
+      "LAY-4"
+    ],
+    "title": "A forbidden register response renders a helpful alert, not a raw error",
+    "objective": "Help copy: \"If a page or action is hidden, the backend enforces the same restriction -- contact an administrator...\" -- verify the UI translates a 403 into the documented guidance.",
+    "priority": "Medium",
+    "type": "UI/Negative",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; signed in as `employee` (no finance.view capability, not an asset manager).",
+    "test_data": "A list request forced to 403 (out-of-scope filter, or network interception).",
+    "steps": [
+      "Sign in as a role whose scope yields a 403 on the asset list request (or intercept the list call and return 403 PERMISSION_DENIED).",
+      "Open http://localhost:3000/assets."
+    ],
+    "expected_result": "A warning alert reads \"You do not have access to these assets\" with text about role or organizational scope and contacting an administrator; a correlation id is shown for support; no stack trace or raw JSON is exposed.",
+    "status": "BLOCKED",
+    "automation_status": "automatable (Playwright)"
+  },
+  {
+    "test_id": "TC-HELP-78",
+    "requirement_ids": [
+      "FR-002",
+      "FR-001"
+    ],
+    "title": "Session expiry returns the user to sign-in with a return path",
+    "objective": "Help copy: \"What you can see and do depends on your role...\" -- verify the access boundary still holds once the session ends mid-session.",
+    "priority": "High",
+    "type": "UI/Security",
+    "preconditions": "Compose stack up; frontend reachable at http://localhost:3000; no active session.",
+    "test_data": "An authenticated session whose cookie is then cleared/expired.",
+    "steps": [
+      "Sign in as `admin` and open http://localhost:3000/assets with filters applied.",
+      "Clear the session cookie (or wait for expiry) and trigger a data request."
+    ],
+    "expected_result": "The app redirects to /login carrying next=<the previous path> and reason=expired, and the sign-in page shows the \"Your session has expired.\" notice; after signing in again the user returns to the original filtered URL.",
+    "status": "PASSED",
+    "automation_status": "automatable (Playwright)"
+  }
+]

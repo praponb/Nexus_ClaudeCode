@@ -6,8 +6,7 @@ definePageMeta({ title: 'Administration' })
 useHead({ title: 'Administration' })
 
 const route = useRoute()
-const { isAdmin } = usePermissions()
-const { loaded } = useAuth()
+const { isAdmin, authResolved } = usePermissions()
 
 const SECTIONS = [
   { to: '/admin/users', label: 'Users' },
@@ -26,7 +25,7 @@ function isActive(to: string): boolean {
 <template>
   <div>
     <InlineAlert
-      v-if="loaded && !isAdmin"
+      v-if="authResolved && !isAdmin"
       tone="warning"
       title="Restricted module"
       message="Administration is limited to system administrators."

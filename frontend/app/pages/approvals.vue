@@ -19,8 +19,8 @@ useHead({ title: 'Approvals' })
 
 const service = useApprovalsService()
 const toast = useToast()
-const { canApprove } = usePermissions()
-const { loaded, user } = useAuth()
+const { canApprove, authResolved } = usePermissions()
+const { viewUser: user } = useAuth()
 
 const page = ref(1)
 const statusFilter = ref('pending')
@@ -74,7 +74,7 @@ const inputClass =
     <PageHeader title="Approvals" description="Requests waiting for your decision, and their history." />
 
     <InlineAlert
-      v-if="loaded && !canApprove"
+      v-if="authResolved && !canApprove"
       tone="warning"
       title="Restricted module"
       message="Your role does not include the approval inbox."

@@ -59,7 +59,19 @@ class AssetViewSet(viewsets.ModelViewSet):
     lookup_field = "uuid"
     http_method_names = ["get", "post", "patch", "delete", "head", "options"]
     filterset_class = AssetFilter
-    search_fields = ["tag", "name", "serial_number", "manufacturer", "model"]
+    # Must match what the UI promises the register filter covers ("tag, serial,
+    # name, model, custodian, or location") and stay aligned with the global
+    # search endpoint below, so both entry points find the same assets.
+    search_fields = [
+        "tag",
+        "name",
+        "serial_number",
+        "manufacturer",
+        "model",
+        "custodian__username",
+        "custodian__display_name",
+        "location__name",
+    ]
     ordering_fields = ["tag", "name", "created_at", "updated_at"]
     ordering = ["tag"]
 

@@ -12,8 +12,7 @@ definePageMeta({ title: 'Edit asset' })
 const route = useRoute()
 const uuid = computed(() => String(route.params.id))
 const service = useAssetsService()
-const { canManageAssets } = usePermissions()
-const { loaded } = useAuth()
+const { canManageAssets, authResolved } = usePermissions()
 
 const { data: asset, pending, error, refresh } = await useAsyncData(
   `asset-edit-${uuid.value}`,
@@ -70,7 +69,7 @@ async function onReload(): Promise<void> {
       @retry="refresh()"
     />
     <InlineAlert
-      v-else-if="loaded && !canManageAssets"
+      v-else-if="authResolved && !canManageAssets"
       tone="warning"
       title="You cannot edit assets"
       message="Your role does not include asset editing. Contact an asset manager or operator."

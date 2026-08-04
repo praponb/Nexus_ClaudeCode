@@ -209,6 +209,12 @@ REST_FRAMEWORK = {
         "rest_framework.filters.OrderingFilter",
         "rest_framework.filters.SearchFilter",
     ],
+    # Free-text search is `?q=` everywhere in this system -- the global search
+    # endpoint (`GET /search/assets/?q=`), the asset register's shareable URL,
+    # and saved-view configs all use it. Without this override SearchFilter
+    # would listen on its default `?search=` instead and silently ignore `q`,
+    # returning an unfiltered list rather than an error.
+    "SEARCH_PARAM": "q",
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_THROTTLE_RATES": {
         "login": "10/minute",

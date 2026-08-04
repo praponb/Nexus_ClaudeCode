@@ -3,6 +3,7 @@ import type {
   AssetSummary,
   AssetWritePayload,
   DuplicateCheckResponse,
+  DuplicateWarning,
   HistoryEvent,
   Paginated,
 } from '~/types/api'
@@ -12,7 +13,8 @@ import { newCorrelationId } from '~/utils/correlation'
 
 export interface CreateAssetResponse {
   asset: AssetDetail
-  warnings: string[]
+  /** Same duplicate-warning objects the check-duplicates endpoint returns. */
+  warnings: DuplicateWarning[]
 }
 
 /** Typed asset endpoints (design §11.3; DRF trailing slashes per Rev 1.1 §11.1). */

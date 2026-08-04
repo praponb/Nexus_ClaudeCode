@@ -5,7 +5,10 @@ import type { Role } from '~/types/api'
  * usability only — the backend re-enforces every authorization decision.
  */
 export function usePermissions() {
-  const { user } = useAuth()
+  // Hydration-safe: these drive markup, so they must read the gated session
+  // rather than the raw one (see useAuth). Before hydration commits every
+  // capability reads as false, matching the session-less SSR shell.
+  const { viewUser: user, authResolved } = useAuth()
 
   const role = computed<Role | null>(() => user.value?.role ?? null)
 
@@ -27,5 +30,15 @@ export function usePermissions() {
   const canApprove = computed(() => hasRole('system_admin', 'asset_manager', 'department_manager'))
   const isAuditor = computed(() => hasRole('auditor'))
 
-  return { role, hasRole, can, canManageAssets, canViewFinance, isAdmin, canApprove, isAuditor }
+  return {
+    role,
+    hasRole,
+    can,
+    canManageAssets,
+    canViewFinance,
+    isAdmin,
+    canApprove,
+    isAuditor,
+    authResolved,
+  }
 }
