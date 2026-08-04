@@ -16,8 +16,7 @@ definePageMeta({ title: 'Reservations' })
 useHead({ title: 'Reservations' })
 
 const service = useReservationsService()
-const { canManageAssets } = usePermissions()
-const { loaded } = useAuth()
+const { canManageAssets, authResolved } = usePermissions()
 
 const page = ref(1)
 const statusFilter = ref('')
@@ -70,7 +69,7 @@ const inputClass =
     />
 
     <InlineAlert
-      v-if="loaded && !canManageAssets"
+      v-if="authResolved && !canManageAssets"
       tone="warning"
       title="Restricted module"
       message="Your role does not include the reservations list."

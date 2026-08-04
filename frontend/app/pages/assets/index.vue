@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { ApiError, isAuthError, isForbiddenError } from '~/utils/errors'
-import { toApiParams, hasActiveFilters, serializeAssetFilters, type AssetListFilters } from '~/utils/filters'
+import {
+  toApiParams,
+  hasActiveFilters,
+  serializeAssetFilters,
+  savedViewConfigToQuery,
+  type AssetListFilters,
+} from '~/utils/filters'
 import PageHeader from '~/components/PageHeader.vue'
 import AppIcon from '~/components/AppIcon.vue'
 import FilterBar from '~/components/filters/FilterBar.vue'
@@ -55,7 +61,10 @@ async function applyView(uuid: string): Promise<void> {
   if (!uuid) return
   const view = views.value.find((v) => v.uuid === uuid)
   if (!view) return
-  await router.replace({ path: '/assets', query: { ...(view.config as Record<string, string>) } })
+  // The stored config is nested; spreading it straight into `query` put the
+  // whole `filters` object through toString() and produced a literal
+  // `?filters=[object Object]`, silently losing the saved filters.
+  await router.replace({ path: '/assets', query: savedViewConfigToQuery(view.config) })
 }
 
 async function saveView(): Promise<void> {

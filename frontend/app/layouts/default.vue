@@ -40,7 +40,24 @@ watch(sessionExpired, async (expired) => {
 
     <div class="transition-[padding]" :class="sidebarCollapsed ? 'lg:pl-16' : 'lg:pl-64'">
       <main id="main-content" tabindex="-1" class="mx-auto w-full max-w-7xl px-4 pb-28 pt-6 sm:px-6 lg:pb-12">
-        <slot />
+        <!--
+          Private page bodies are client-only by design (nuxt.config.ts: SSR
+          covers the shell and sign-in only; every page fetches with
+          `server: false`). Rendering them on the server produced markup the
+          client never reproduces -- the server sees a resolved-but-empty
+          request and paints an empty state, while the client's first render is
+          still pending and paints a skeleton. That swaps element types inside
+          `v-if` chains, corrupting the hydrated VDOM and silently breaking
+          NuxtLink navigation. Rendering the skeleton on both sides instead
+          keeps hydration exact and removes the "No assets registered yet"
+          flash that preceded every load.
+        -->
+        <ClientOnly>
+          <slot />
+          <template #fallback>
+            <LoadingSkeleton :lines="6" label="Loading page…" />
+          </template>
+        </ClientOnly>
       </main>
     </div>
 

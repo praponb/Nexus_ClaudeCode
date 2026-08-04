@@ -4,7 +4,21 @@ import type { CurrentUser } from '~/types/api'
 export function useAuth() {
   const user = useState<CurrentUser | null>('auth:user', () => null)
   const loaded = useState<boolean>('auth:loaded', () => false)
+  const hydrated = useState<boolean>('app:hydrated', () => false)
   const api = useApi()
+
+  /**
+   * Hydration-safe view of the session, for rendering only.
+   *
+   * `user`/`loaded` are resolved by `auth.global.ts` before the client
+   * hydrates, but the SSR shell rendered with no session at all. Templates
+   * must read these instead, so the first client render reproduces the
+   * server markup and Vue never has to patch a mismatch (see
+   * `plugins/hydrated.client.ts`). Keep using `user`/`loaded` for logic,
+   * middleware, and anything that never reaches the DOM.
+   */
+  const viewUser = computed<CurrentUser | null>(() => (hydrated.value ? user.value : null))
+  const authResolved = computed<boolean>(() => hydrated.value && loaded.value)
 
   async function fetchUser(): Promise<CurrentUser | null> {
     try {
@@ -40,5 +54,5 @@ export function useAuth() {
     user.value = null
   }
 
-  return { user, loaded, fetchUser, login, logout, clearSession }
+  return { user, loaded, viewUser, authResolved, fetchUser, login, logout, clearSession }
 }

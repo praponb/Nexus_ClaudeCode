@@ -14,8 +14,7 @@ definePageMeta({ title: 'Maintenance' })
 useHead({ title: 'Maintenance' })
 
 const service = useMaintenanceService()
-const { canManageAssets } = usePermissions()
-const { loaded } = useAuth()
+const { canManageAssets, authResolved } = usePermissions()
 
 const page = ref(1)
 const { data, pending, error, refresh } = await useAsyncData(
@@ -41,7 +40,7 @@ function openComplete(record: MaintenanceRecord): void {
     <PageHeader title="Maintenance" description="Open repair and service work, plus maintenance history." />
 
     <InlineAlert
-      v-if="loaded && !canManageAssets"
+      v-if="authResolved && !canManageAssets"
       tone="warning"
       title="Restricted module"
       message="Your role does not include the maintenance work list."

@@ -12,8 +12,7 @@ definePageMeta({ title: 'Reports' })
 useHead({ title: 'Reports' })
 
 const service = useReportsService()
-const { canApprove, isAuditor } = usePermissions()
-const { loaded } = useAuth()
+const { canApprove, isAuditor, authResolved } = usePermissions()
 
 const canViewReports = computed(() => canApprove.value || isAuditor.value)
 
@@ -35,7 +34,7 @@ const reports = computed(() => data.value ?? [])
     />
 
     <InlineAlert
-      v-if="loaded && !canViewReports"
+      v-if="authResolved && !canViewReports"
       tone="warning"
       title="Restricted module"
       message="Your role does not include the reports catalog."

@@ -20,8 +20,7 @@ useHead({ title: 'Imports' })
 const STEPS = ['Upload', 'Validate & preview', 'Commit', 'Result']
 
 const service = useImportsService()
-const { canManageAssets } = usePermissions()
-const { loaded } = useAuth()
+const { canManageAssets, authResolved } = usePermissions()
 
 const step = ref(0)
 const job = ref<ImportJob | null>(null)
@@ -147,7 +146,7 @@ const inputFileClass =
     </PageHeader>
 
     <InlineAlert
-      v-if="loaded && !canManageAssets"
+      v-if="authResolved && !canManageAssets"
       tone="warning"
       title="Restricted module"
       message="Your role does not include CSV imports."

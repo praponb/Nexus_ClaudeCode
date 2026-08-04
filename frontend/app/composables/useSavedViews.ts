@@ -1,7 +1,7 @@
 import type { SavedView } from '~/types/api'
 import { unwrapList } from '~/types/api'
 import type { AssetListFilters } from '~/utils/filters'
-import { serializeAssetFilters } from '~/utils/filters'
+import { toSavedViewConfig } from '~/utils/filters'
 
 /** Saved views: own views CRUD (design FR-006, cycle-1 scope). */
 export function useSavedViews() {
@@ -30,7 +30,9 @@ export function useSavedViews() {
     try {
       const view = await api.post<SavedView>('/saved-views/', {
         name,
-        config: serializeAssetFilters(filters),
+        // Backend contract is nested (`{filters: {...}, ordering, page_size}`);
+        // sending the flat URL shape gets every dimension rejected as unknown.
+        config: toSavedViewConfig(filters),
         shared: false,
         is_default: false,
       })

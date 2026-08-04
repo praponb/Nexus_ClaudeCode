@@ -86,7 +86,7 @@ export interface AssetSummary {
   department: NamedRef | null
   location: NamedRef | null
   updated_at: string
-  warnings?: string[]
+  warnings?: DuplicateWarning[]
 }
 
 export interface AssetDetail extends AssetSummary {
@@ -157,16 +157,29 @@ export interface CategoryRef extends NamedRef {
   attribute_definitions?: CategoryAttributeDefinition[]
 }
 
-export interface DuplicateCandidate {
+/** An existing asset that tripped a duplicate rule (BR-008). */
+export interface DuplicateMatch {
   uuid: string
   tag: string
   name: string
-  match_reasons: string[]
+}
+
+/**
+ * One duplicate rule that matched, with the assets it matched.
+ *
+ * The backend groups matches under the rule that found them
+ * (`services.find_duplicate_warnings`), so the reason and the assets stay
+ * associated -- which is what makes the panel reviewable. Typing `warnings` as
+ * `string[]` here is what rendered the panel as "[object Object]".
+ */
+export interface DuplicateWarning {
+  code: string
+  message: string
+  matches: DuplicateMatch[]
 }
 
 export interface DuplicateCheckResponse {
-  warnings: string[]
-  candidates: DuplicateCandidate[]
+  warnings: DuplicateWarning[]
 }
 
 export interface HistoryEvent {
@@ -199,10 +212,25 @@ export interface DashboardSummary {
   generated_at: string
 }
 
+/**
+ * Stored shape of a saved view's configuration.
+ *
+ * This mirrors the backend contract exactly (`SavedViewSerializer.validate_config`
+ * allows only `filters`/`ordering`/`columns`/`page_size` at the top level, with
+ * the filter dimensions nested under `filters`). Sending the flat, URL-shaped
+ * object instead makes the API reject every dimension as an unknown key.
+ */
+export interface SavedViewConfig {
+  filters?: Record<string, string>
+  ordering?: string
+  columns?: string[]
+  page_size?: number
+}
+
 export interface SavedView {
   uuid: string
   name: string
-  config: Record<string, unknown>
+  config: SavedViewConfig
   shared: boolean
   is_default: boolean
 }

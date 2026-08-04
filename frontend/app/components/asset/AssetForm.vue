@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AssetDetail, AssetWritePayload, DuplicateCandidate } from '~/types/api'
+import type { AssetDetail, AssetWritePayload, DuplicateWarning } from '~/types/api'
 import { ApiError, isVersionConflict } from '~/utils/errors'
 import { newCorrelationId } from '~/utils/correlation'
 import AppIcon from '~/components/AppIcon.vue'
@@ -136,8 +136,7 @@ const conflict = ref<ApiError | null>(null)
 const submitting = ref(false)
 const summaryRef = ref<HTMLElement | null>(null)
 
-const duplicateWarnings = ref<string[]>([])
-const duplicateCandidates = ref<DuplicateCandidate[]>([])
+const duplicateWarnings = ref<DuplicateWarning[]>([])
 const duplicatesAcknowledged = ref(false)
 const duplicatePanelRef = ref<HTMLElement | null>(null)
 
@@ -149,7 +148,6 @@ watch(
   () => {
     duplicatesAcknowledged.value = false
     duplicateWarnings.value = []
-    duplicateCandidates.value = []
   },
 )
 
@@ -230,8 +228,7 @@ async function duplicatesClear(): Promise<boolean> {
       props.mode === 'edit' ? props.initial?.uuid : undefined,
     )
     duplicateWarnings.value = res.warnings ?? []
-    duplicateCandidates.value = res.candidates ?? []
-    if (duplicateWarnings.value.length || duplicateCandidates.value.length) {
+    if (duplicateWarnings.value.length) {
       duplicatesAcknowledged.value = true
       await nextTick()
       duplicatePanelRef.value?.focus()
@@ -273,7 +270,8 @@ async function onSubmit(): Promise<void> {
       snapshot.value = JSON.stringify(form)
       idempotencyKey.value = newCorrelationId()
       if (warnings.length) {
-        toast.info(`Asset ${saved.tag} saved with warnings`, warnings[0])
+        // `warnings` are objects, not strings -- read the human-readable field.
+        toast.info(`Asset ${saved.tag} saved with warnings`, warnings[0]?.message)
       } else {
         toast.success(`Asset ${saved.tag} registered`)
       }
@@ -393,11 +391,11 @@ function formatFieldName(field: string): string {
     </div>
 
     <div
-      v-if="duplicateWarnings.length || duplicateCandidates.length"
+      v-if="duplicateWarnings.length"
       ref="duplicatePanelRef"
       tabindex="-1"
     >
-      <AssetDuplicatePanel :warnings="duplicateWarnings" :candidates="duplicateCandidates" />
+      <AssetDuplicatePanel :warnings="duplicateWarnings" />
       <p class="mt-2 text-sm text-muted">
         If none of these are the same physical asset, choose “Save asset anyway” to continue.
       </p>

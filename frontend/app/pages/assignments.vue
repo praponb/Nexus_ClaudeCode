@@ -15,8 +15,7 @@ definePageMeta({ title: 'Assignments' })
 useHead({ title: 'Assignments' })
 
 const service = useAssetsService()
-const { canManageAssets } = usePermissions()
-const { loaded } = useAuth()
+const { canManageAssets, authResolved } = usePermissions()
 
 const { data: inTransit, pending: pendingTransit, error: transitError, refresh: refreshTransit } =
   await useAsyncData(
@@ -52,7 +51,7 @@ function refreshAll(): void {
     />
 
     <InlineAlert
-      v-if="loaded && !canManageAssets"
+      v-if="authResolved && !canManageAssets"
       tone="warning"
       title="Restricted work queue"
       message="Your role does not include the assignment work queue. Use the asset register to look up your own assets."

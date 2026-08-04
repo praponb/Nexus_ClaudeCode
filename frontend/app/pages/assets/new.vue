@@ -7,8 +7,7 @@ import InlineAlert from '~/components/InlineAlert.vue'
 definePageMeta({ title: 'Register asset' })
 useHead({ title: 'Register asset' })
 
-const { canManageAssets } = usePermissions()
-const { loaded } = useAuth()
+const { canManageAssets, authResolved } = usePermissions()
 
 function onSaved(asset: AssetDetail): void {
   void navigateTo(`/assets/${asset.uuid}`)
@@ -28,7 +27,7 @@ function onSaved(asset: AssetDetail): void {
     </PageHeader>
 
     <InlineAlert
-      v-if="loaded && !canManageAssets"
+      v-if="authResolved && !canManageAssets"
       tone="warning"
       title="You cannot register assets"
       message="Your role does not include asset registration. Contact an asset manager or operator."

@@ -253,3 +253,71 @@ def test_history_endpoint_returns_lifecycle_and_audit(api_client, authed, make_u
     assert response.status_code == 200
     types = {event["type"] for event in response.json()["results"]}
     assert {"lifecycle", "audit"} <= types
+
+
+def test_list_free_text_search_filters_on_q(api_client, authed, make_user, reference):
+    """The register's free-text box sends `?q=` (FR-005). It must actually
+    narrow the list -- returning every asset unfiltered silently defeats the
+    filter and misleads the user, since the UI still shows a "Search:" chip.
+    """
+    operator = _scoped_operator(make_user, "op-searchq", reference)
+    client = authed(operator)
+    _create(client, reference, name="Developer laptop", serial_number="SN-Q-1")
+    _create(client, reference, name="Warehouse forklift", serial_number="SN-Q-2")
+
+    response = client.get("/api/v1/assets/?q=forklift")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["count"] == 1, "q must narrow the result set, not be ignored"
+    assert body["results"][0]["name"] == "Warehouse forklift"
+
+
+def test_list_free_text_search_covers_every_advertised_field(
+    api_client, authed, make_user, reference
+):
+    """The filter input is labelled "tag, serial, name, model, custodian, or
+    location" and the Help page repeats that promise, so each of those fields
+    must be searchable from the list endpoint.
+    """
+    from apps.assets.models import Asset
+
+    operator = _scoped_operator(make_user, "op-searchfields", reference)
+    client = authed(operator)
+    custodian = make_user("keeper-jane", "employee", department=reference.department)
+    asset = _create(
+        client,
+        reference,
+        name="Developer laptop",
+        serial_number="SN-FIELDS-9",
+        manufacturer="Dell",
+        model="Latitude-5540",
+    )
+    Asset.objects.filter(uuid=asset["uuid"]).update(custodian=custodian)
+    _create(client, reference, name="Unrelated monitor", serial_number="SN-OTHER-9")
+
+    for term in [
+        asset["tag"],
+        "SN-FIELDS-9",
+        "Developer",
+        "Latitude-5540",
+        "keeper-jane",
+        reference.location.name,
+    ]:
+        response = client.get("/api/v1/assets/", {"q": term})
+        assert response.status_code == 200, term
+        tags = {row["tag"] for row in response.json()["results"]}
+        assert asset["tag"] in tags, f"q={term!r} did not match on an advertised field"
+
+
+def test_list_free_text_search_respects_scope(api_client, authed, make_user, reference):
+    """Search must not become a way around organizational scope (FR-002)."""
+    from apps.assets.models import Asset
+
+    owner = _scoped_operator(make_user, "op-scope-owner", reference)
+    asset = _create(authed(owner), reference, name="Secret prototype")
+    Asset.objects.filter(uuid=asset["uuid"]).update(department=reference.other_department)
+
+    outsider = _scoped_operator(make_user, "op-scope-outsider", reference)
+    response = authed(outsider).get("/api/v1/assets/?q=Secret")
+    assert response.status_code == 200
+    assert response.json()["count"] == 0

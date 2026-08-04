@@ -18,8 +18,7 @@ useHead({ title: 'Data quality' })
 
 const service = useDataQualityService()
 const toast = useToast()
-const { canManageAssets } = usePermissions()
-const { loaded } = useAuth()
+const { canManageAssets, authResolved } = usePermissions()
 
 const page = ref(1)
 const severity = ref('')
@@ -67,7 +66,7 @@ const inputClass =
     />
 
     <InlineAlert
-      v-if="loaded && !canManageAssets"
+      v-if="authResolved && !canManageAssets"
       tone="warning"
       title="Restricted work queue"
       message="Your role does not include the data-quality queue."
