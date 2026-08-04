@@ -48,6 +48,12 @@ if (
         "LOCAL_AUTH_ALLOW_IN_PRODUCTION=true to explicitly override."
     )
 
+# TLS terminates at the Cloudflare Tunnel edge; cloudflared forwards to this
+# app over plain HTTP internally but reliably sets X-Forwarded-Proto (verified
+# empirically against the live tunnel). Without this, SECURE_SSL_REDIRECT
+# below would treat every request as insecure and redirect-loop forever.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 SECURE_SSL_REDIRECT = True
 SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
