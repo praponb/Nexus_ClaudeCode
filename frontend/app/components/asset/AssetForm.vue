@@ -127,8 +127,24 @@ watch(
     categoryAttributes.value = {}
   },
 )
-
 const isDirty = computed(() => JSON.stringify(form) !== snapshot.value)
+
+function getCategoryStringAttr(key: string): string {
+  const val = categoryAttributes.value[key]
+  return typeof val === 'string' ? val : (val === true ? 'true' : '')
+}
+
+function setCategoryStringAttr(key: string, val: string): void {
+  categoryAttributes.value[key] = val
+}
+
+function getCategoryBoolAttr(key: string): boolean {
+  return Boolean(categoryAttributes.value[key])
+}
+
+function setCategoryBoolAttr(key: string, val: boolean): void {
+  categoryAttributes.value[key] = val
+}
 
 const errors = ref<Record<string, string>>({})
 const summaryError = ref<ApiError | null>(null)
@@ -487,9 +503,10 @@ function formatFieldName(field: string): string {
         <select
           v-if="def.field_type === 'choice'"
           :id="inputId"
-          v-model="categoryAttributes[def.key]"
+          :value="getCategoryStringAttr(def.key)"
           :aria-describedby="describedBy"
           :class="fieldClass(Boolean(errors[`category_attributes.${def.key}`]))"
+          @change="setCategoryStringAttr(def.key, ($event.target as HTMLSelectElement).value)"
         >
           <option value="">Select {{ def.label.toLowerCase() }}</option>
           <option v-for="opt in def.options" :key="opt" :value="opt">{{ opt }}</option>
@@ -498,21 +515,28 @@ function formatFieldName(field: string): string {
           v-else-if="def.field_type === 'bool'"
           class="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-ink-secondary"
         >
-          <input :id="inputId" v-model="categoryAttributes[def.key]" type="checkbox" class="h-4 w-4 accent-accent" >
+          <input
+            :id="inputId"
+            :checked="getCategoryBoolAttr(def.key)"
+            type="checkbox"
+            class="h-4 w-4 accent-accent"
+            @change="setCategoryBoolAttr(def.key, ($event.target as HTMLInputElement).checked)"
+          >
           {{ def.label }}
         </label>
         <textarea
           v-else-if="def.field_type === 'longtext'"
           :id="inputId"
-          v-model="categoryAttributes[def.key]"
+          :value="getCategoryStringAttr(def.key)"
           rows="3"
           :aria-describedby="describedBy"
           :class="fieldClass(Boolean(errors[`category_attributes.${def.key}`]))"
+          @input="setCategoryStringAttr(def.key, ($event.target as HTMLTextAreaElement).value)"
         />
         <input
           v-else
           :id="inputId"
-          v-model="categoryAttributes[def.key]"
+          :value="getCategoryStringAttr(def.key)"
           :type="
             def.field_type === 'number' || def.field_type === 'decimal' || def.field_type === 'currency'
               ? 'number'
@@ -527,6 +551,7 @@ function formatFieldName(field: string): string {
           :aria-invalid="Boolean(errors[`category_attributes.${def.key}`])"
           :class="fieldClass(Boolean(errors[`category_attributes.${def.key}`]))"
           autocomplete="off"
+          @input="setCategoryStringAttr(def.key, ($event.target as HTMLInputElement).value)"
         >
       </FormField>
     </fieldset>

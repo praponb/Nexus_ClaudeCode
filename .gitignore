@@ -39,3 +39,6 @@ runs/*
 # Playwright MCP session artifacts (snapshots/screenshots written by the
 # Playwright MCP server during interactive debugging, not test output)
 .playwright-mcp/
+
+# Backups
+backups/

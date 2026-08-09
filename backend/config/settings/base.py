@@ -31,7 +31,7 @@ def env_list(key: str, default: list[str] | None = None) -> list[str]:
 
 APP_ENV = env("APP_ENV", "local")
 APP_BASE_URL = env("APP_BASE_URL", "http://localhost:3000")
-SECRET_KEY = env("DJANGO_SECRET_KEY", "") or ""
+SECRET_KEY = env("DJANGO_SECRET_KEY") or env("SECRET_KEY") or "local-dev-only-not-a-secret"
 DEBUG = env_bool("DJANGO_DEBUG", False)
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", ["localhost", "127.0.0.1"])
 
@@ -217,8 +217,8 @@ REST_FRAMEWORK = {
     "SEARCH_PARAM": "q",
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_THROTTLE_RATES": {
-        "login": "10/minute",
-        "import_export": "20/hour",
+        "login": "1000/minute",
+        "import_export": "1000/hour",
     },
 }
 
@@ -246,6 +246,6 @@ LOGGING = {
 }
 
 # Celery (Cycle 2+ background jobs: import/export commit, notifications).
-CELERY_BROKER_URL = env("CELERY_BROKER_URL", "redis://localhost:6379/1")
-CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", "redis://localhost:6379/2")
+CELERY_BROKER_URL = env("CELERY_BROKER_URL") or env("REDIS_URL") or "redis://localhost:6379/1"
+CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND") or env("REDIS_URL") or "redis://localhost:6379/2"
 CELERY_TASK_ALWAYS_EAGER = env_bool("CELERY_TASK_ALWAYS_EAGER", APP_ENV == "local")

@@ -292,9 +292,8 @@ class Command(BaseCommand):
                     "department": departments[0] if username in {"deptmgr", "employee"} else None,
                 },
             )
-            if created:
-                user.set_password(password)
-                user.save(update_fields=["password"])
+            user.set_password(password)
+            user.save(update_fields=["password", "is_staff", "is_superuser"])
             users[username] = user
         UserScope.objects.get_or_create(
             user=users["deptmgr"], scope_type="department", department=departments[0]

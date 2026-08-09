@@ -10,9 +10,9 @@ Web Application. Implements the contracts in `detail-design-specification.md`
   (verified with 6.0.7 on Python 3.12–3.14), matching the stack baseline. If a
   deployment platform cannot run 6.0, pin the newest 5.2 LTS patch and record
   an ADR (`front-back-end-stack.md` §4 rule 4).
-- **uv.lock**: the Docker build installs from `pyproject.toml`. Generate and
-  commit `uv.lock` with `uv lock` in the first environment that has `uv` +
-  network access (still pending; ADR-003/DEF-103, risk-accepted for release).
+- **uv.lock**: generated and committed (`uv.lock`). The Docker build copies
+  `uv.lock` and uses `uv sync --frozen` for reproducible, locked builds
+  (resolving ADR-003/DEF-103).
 - **Trailing slashes**: all API endpoints use DRF-standard trailing slashes
   (`/api/v1/assets/`, `/api/v1/auth/login/`, …). This is a deliberate contract
   clarification of design §11.3 (which omitted slashes).

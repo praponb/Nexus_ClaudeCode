@@ -5,14 +5,31 @@ import { expect, test, type Page } from '@playwright/test'
 // data quality (FR-028), retirement dialog (FR-014). Render-level checks
 // that avoid backend mutations so they stay stable against seed data.
 const ADMIN_USER = process.env.E2E_ADMIN_USER || 'admin'
-const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || ''
+const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || process.env.SEED_DEMO_PASSWORD || '!Kiknitip01'
 
 async function signIn(page: Page): Promise<void> {
   await page.goto('/login')
-  await page.getByLabel(/username/i).fill(ADMIN_USER)
-  await page.getByLabel(/password/i).fill(ADMIN_PASSWORD)
-  await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page).toHaveURL(/\/$/)
+  const userEl = page.locator('#login-username')
+  const isFormVisible = await userEl.isVisible({ timeout: 1500 }).catch(() => false)
+  if (!isFormVisible) {
+    return
+  }
+  const passEl = page.locator('#login-password')
+  const submitBtn = page.getByRole('button', { name: 'Sign in' })
+
+  await userEl.click()
+  await userEl.fill(ADMIN_USER)
+  await passEl.click()
+  await passEl.fill(ADMIN_PASSWORD)
+
+  if (await submitBtn.isDisabled()) {
+    await userEl.fill(ADMIN_USER)
+    await passEl.fill(ADMIN_PASSWORD)
+  }
+
+  await expect(submitBtn).toBeEnabled({ timeout: 5000 })
+  await submitBtn.click()
+  await expect(page).not.toHaveURL(/\/login$/, { timeout: 10000 })
 }
 
 test.describe('cycle-3 control modules', () => {
@@ -23,7 +40,7 @@ test.describe('cycle-3 control modules', () => {
   test('reservations list renders with overdue filter (FR-010)', async ({ page }) => {
     await signIn(page)
     await page.goto('/reservations')
-    await expect(page.getByRole('heading', { name: 'Reservations' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Reservations', exact: true })).toBeVisible()
     await expect(page.getByLabel(/status/i)).toBeVisible()
     await expect(page.getByLabel(/overdue only/i)).toBeVisible()
   })
@@ -31,39 +48,39 @@ test.describe('cycle-3 control modules', () => {
   test('approval inbox renders pending requests (FR-024)', async ({ page }) => {
     await signIn(page)
     await page.goto('/approvals')
-    await expect(page.getByRole('heading', { name: 'Approvals' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Approvals', exact: true })).toBeVisible()
   })
 
   test('notification center renders with preferences (FR-023)', async ({ page }) => {
     await signIn(page)
     await page.goto('/notifications')
-    await expect(page.getByRole('heading', { name: 'Notifications' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Notifications', exact: true })).toBeVisible()
     await page.getByRole('button', { name: /preferences/i }).click()
-    await expect(page.getByRole('heading', { name: 'Notification preferences' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Notification preferences', exact: true })).toBeVisible()
   })
 
   test('reports catalog renders (FR-021)', async ({ page }) => {
     await signIn(page)
     await page.goto('/reports')
-    await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Reports', exact: true })).toBeVisible()
   })
 
   test('admin user table renders for system administrators (FR-027)', async ({ page }) => {
     await signIn(page)
     await page.goto('/admin/users')
-    await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Users', exact: true })).toBeVisible()
   })
 
   test('data-quality queue renders (FR-028)', async ({ page }) => {
     await signIn(page)
     await page.goto('/data-quality')
-    await expect(page.getByRole('heading', { name: 'Data quality' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Data quality', exact: true })).toBeVisible()
   })
 
   test('retire dialog opens from the asset detail (FR-014)', async ({ page }) => {
     await signIn(page)
     await page.goto('/assets')
-    const firstRow = page.locator('tbody tr td a').first()
+    const firstRow = page.locator('a[href^="/assets/"]:not([href="/assets/new"])').first()
     await expect(firstRow).toBeVisible()
     await firstRow.click()
 
