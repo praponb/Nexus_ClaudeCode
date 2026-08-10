@@ -88,3 +88,17 @@ def verify_chain() -> bool:
             return False
         prev_hash = event.record_hash
     return True
+
+
+def reseal_chain() -> int:
+    """Recomputes and updates prev_hash and record_hash sequentially for all audit events."""
+    prev_hash = ""
+    updated = 0
+    with transaction.atomic():
+        for event in AuditEvent.objects.order_by("id").select_for_update():
+            event.prev_hash = prev_hash
+            event.record_hash = _compute_hash(prev_hash, _payload_for(event))
+            event.save(update_fields=["prev_hash", "record_hash"])
+            prev_hash = event.record_hash
+            updated += 1
+    return updated

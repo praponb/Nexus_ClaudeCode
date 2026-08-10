@@ -6,9 +6,16 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.local")
 
 try:
     from celery import Celery
+    from celery.schedules import crontab
 except ImportError:  # pragma: no cover - celery optional until Cycle 2
     app = None
 else:
     app = Celery("asset_inventory")
     app.config_from_object("django.conf:settings", namespace="CELERY")
     app.autodiscover_tasks()
+    app.conf.beat_schedule = {
+        "send-due-reminders-daily": {
+            "task": "apps.notifications.tasks.send_due_reminders",
+            "schedule": crontab(hour=8, minute=0),
+        },
+    }

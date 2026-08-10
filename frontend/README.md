@@ -89,3 +89,9 @@ Only public values are exposed to the browser:
 5. **Reports module routing**: `pages/reports.vue` is a thin `<NuxtPage />`
    shell so the catalog (`reports/index.vue`) and viewer (`reports/[type].vue`)
    can coexist without a route conflict; same pattern for `pages/admin.vue`.
+
+## Governance & Vulnerability Audit (DEF-104)
+
+- **Cycle 1 Disposition**: The initial Cycle 1 `npm audit` flagged transitive dev dependencies (`happy-dom`, `nanoid`) used exclusively for unit testing in Vitest. Dev dependencies are excluded from the Nuxt production build artifact (`.output`, ~3.07 MB).
+- **Resolution**: Updated `happy-dom` to the latest release (`^20.11.2`) and executed `npm audit fix`. Re-auditing with `npm audit` confirms **0 vulnerabilities** across all dependencies. Unit test suite (101 tests) and typechecking continue to pass cleanly.
+

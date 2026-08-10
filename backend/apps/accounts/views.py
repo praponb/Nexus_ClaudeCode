@@ -23,6 +23,13 @@ class LoginThrottle(ScopedSimpleRateThrottle):
 
     scope = "login"
 
+    def get_cache_key(self, request, view):
+        if request.user and request.user.is_authenticated:
+            ident = request.user.pk
+        else:
+            ident = self.get_ident(request)
+        return self.cache_format % {"scope": self.scope, "ident": ident}
+
 
 def _client_ip(request) -> str | None:
     forwarded = request.META.get("HTTP_X_FORWARDED_FOR")

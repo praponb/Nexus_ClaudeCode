@@ -23,10 +23,14 @@ MAX_UPLOAD_BYTES = 32 * 1024 * 1024
 
 
 class ImportExportThrottle(ScopedSimpleRateThrottle):
-    """Rate limit on import/export job creation (NFR-007). When the scope has
-    no configured rate (e.g. the test settings), requests are allowed."""
+    """Rate limit on heavy CSV import/export operations (NFR-007)."""
 
     scope = "import_export"
+
+    def allow_request(self, request, view):
+        if self.rate is None:
+            return True
+        return super().allow_request(request, view)
 
 
 class ImportTemplateView(APIView):

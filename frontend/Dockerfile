@@ -4,7 +4,8 @@ FROM node:22-slim AS base
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci
+COPY scripts ./scripts
+RUN npm install
 
 COPY . .
 
