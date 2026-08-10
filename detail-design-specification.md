@@ -1,333 +1,341 @@
-# Detail Design Specification — Asset Inventory Web Application
+# Asset Inventory Web Application — Detailed Design Specification
 
-- **Document:** `detail-design-specification.md`
-- **Version:** 1.2 (Cycle 2 — review revision)
-- **Status:** Active design baseline
+- **Document:** detail-design-specification.md
+- **Version:** 1.0 (Cycle 1 — initial design)
 - **Sources:** `requirements/specification.md`, `requirements/layout.md`, `requirements/front-back-end-stack.md`
+- **Status:** Initial design for implementation
 
 ---
 
 ## 1. Goals, Scope, and Non-Goals
 
 ### 1.1 Goals
+Deliver a secure, responsive, dark-themed web application that is the single source of truth for company assets across their lifecycle: registration, assignment, transfer, return, maintenance, stocktake, retirement, and disposal, with full audit history, role/scope-based authorization, dashboards, reports, CSV import/export, and barcode/QR support.
 
-Build a secure, responsive, dark-themed web application that is the single source of truth for company assets across their lifecycle: registration, assignment, transfer, return, maintenance, verification (stocktake), retirement, and disposal — with full audit history, role/scope-based access control, dashboards, reports, CSV import/export, and notifications.
-
-### 1.2 In Scope (initial release)
-
-Per `specification.md` §4.1: authn/authz, asset registration/editing, unique tags, configurable reference data, assignment/transfer/return/reservation/checkout, status/condition management, maintenance records, warranty/expiry tracking, retirement/loss/theft/disposal workflows, attachments/notes/images, search/filter/sort/pagination, barcode/QR representation and browser-based scanning, CSV bulk import/export, dashboard/reports/saved views, stocktake sessions, notifications, full audit history, validation and duplicate detection, responsive accessible UI.
+### 1.2 In Scope (this build)
+All "Must Have" and "Should Have" items from specification.md §22: authentication, authorization, asset CRUD with unique tags, search/filter/sort/pagination, saved views, assignment/transfer/return/reservation, status & condition management with configurable transitions, maintenance, warranty/expiry tracking, lost/stolen/missing/damaged reporting, retirement & disposal workflow, attachments, notes, barcode/QR representation and browser scanning, CSV bulk import/export, dashboard, reports, stocktake sessions, in-app notifications (email behind config flag), configurable approvals, audit history, reference-data and user administration, data-quality queue, activity feed, archiving, dark theme, responsive layout, WCAG 2.2 AA.
 
 ### 1.3 Non-Goals (initial release)
-
-Per `specification.md` §4.2: native mobile apps, network device discovery, remote control/software deployment, procurement/PO processing, accounting/depreciation/GL posting, advanced contract management, GPS tracking, RFID hardware integration, external customer asset management, predictive maintenance. Architecture must not preclude these later.
-
-### 1.4 Delivery strategy and current state (updated in Rev 1.2)
-
-Original three-cycle sequencing: C1 = foundation + core asset workflows; C2 = operations; C3 = hardening. The workspace contains a feature-complete implementation of all three cycles (provenance: run `run-1c738338ee96`, adopted in Rev 1.1), with executed QA evidence of backend 155 pytest + frontend 88 Vitest tests green at adoption time.
-
-**Cycle-2 review finding (Rev 1.2):** this run's cycle-2 work closed the two release-gating engineering items, verified by workspace inspection:
-
-- **DEF-104 closed:** npm-audit critical transitive dev dependency fixed — `happy-dom` bumped to `^20.11.2`, `npm audit fix` executed, re-audit reports **0 vulnerabilities**; documented in `frontend/README.md` "Governance & Vulnerability Audit (DEF-104)". Frontend unit suite now 101 tests (was 88).
-- **DEF-103 / ADR-003 closed:** `backend/uv.lock` committed (revision 3 lockfile; `uv sync --frozen` builds are now reproducible).
-
-**New risk introduced (I-10):** the fresh `uv.lock` resolved **Django 6.1 / DRF 3.18.0** while all executed backend test evidence (155 tests) was gathered against **Django 6.0.7 / DRF 3.17.1**. The frozen dependency set has not been regression-tested; cycle 3 must either verify the suite against the locked versions or constrain the lock to Django 6.0.x per the stack version policy.
-
-**Process issue persists (I-8):** this run's cycle-2 agent summaries and QA execution reports were again not filed under `runs/run-a1e626552a49/cycle-2/`. Cycle 3 makes filing them a hard DoD item.
-
-Remaining for cycle 3 (final): re-execution of all gates against the locked workspace with evidence filed under this run; the still-missing activity-feed union (FR-029) and notification email-path (FR-023) tests; duplicate QA test-ID renumber; the consolidated environment-limited verification register; final per-requirement traceability and release-readiness statement.
+Native mobile apps, network discovery, remote device control, procurement/PO processing, depreciation/GL posting, advanced contract management, GPS, RFID hardware, external-customer asset management, predictive maintenance, offline stocktake (deferred — see §3), light theme (dark is the only shipped theme; token structure allows adding light later).
 
 ---
 
-## 2. Assumptions and Unresolved Questions
+## 2. Technology Stack (fixed by front-back-end-stack.md)
 
-### 2.1 Assumptions adopted (from `specification.md` §20, confirmed for design)
+| Layer | Choice |
+|---|---|
+| Frontend | Nuxt 4, Vue 3 Composition API, TypeScript strict, Nuxt UI + Tailwind CSS, Pinia (only where genuinely shared), pnpm |
+| Backend | Django 6.0, Django REST Framework, Python 3.12+, Psycopg 3, uv |
+| Database | PostgreSQL 18 (UTF-8, UTC timestamptz) |
+| Async | Celery + Redis (imports, exports, notifications, reminders, data-quality checks) |
+| Object storage | S3-compatible in production; local filesystem media in dev only |
+| API | Versioned JSON REST under `/api/v1/`, OpenAPI via drf-spectacular |
+| Local dev | Docker Compose (`frontend`, `backend`, `postgres`, `redis`, `celery-worker`, `celery-beat`, optional MinIO) |
 
-1. Internal organizational use; English UI only (i18n-ready structure).
-2. No external OIDC provider is available in the generated environment. **Decision:** production-grade session-cookie authentication backed by Django is the built-in mechanism; an OIDC integration seam (settings-driven) is designed but not wired to a live provider (§15). Local auth is inert in production unless double opt-in (`LOCAL_AUTH_ENABLED` + `LOCAL_AUTH_ALLOW_IN_PRODUCTION`).
-3. CSV is sufficient for bulk exchange; UTF-8 with BOM-tolerant parsing.
-4. Scanning uses browser camera APIs with manual entry fallback; no dedicated hardware.
-5. Financial depreciation/accounting is out of scope; monetary fields are stored as decimal + ISO currency, visibility-restricted.
-6. Approval workflows are configurable (per-transition `requires_approval`, global `APPROVALS_ENABLED=false` escape hatch) with sensible defaults (disposal requires approval; transfers optional). Separation of duties defaults on.
-7. Planning volume: 100k assets, 5k users, 250 concurrent users, 1M lifecycle/audit events, 25k-row imports.
-8. Hosting platform is not fixed; delivery targets container images runnable under Docker Compose locally, documented for generic container hosting.
-
-### 2.2 Detected issues in inputs and their resolutions
-
-| # | Issue | Resolution |
-|---|-------|------------|
-| I-1 | Stack doc mandates Nuxt 4, Django 6.0, PostgreSQL 18, which may postdate available stable releases at implementation time. | Stack doc §4 rule 4 applied. Delivered: Nuxt 4, postgres:18 image, Django 6.x (see I-10 for the 6.0→6.1 lockfile drift under cycle-3 verification). Backend range `>=5.2,<6.2` permits pinning 5.2 LTS with an ADR where required. |
-| I-2 | OIDC "preferred" but no provider defined; local auth "may be supplied". | Session-cookie auth shipped as default behind an auth-backend seam; OIDC settings optional; local auth production-gated (D-01/D-13). |
-| I-3 | Malware scanning of attachments conditional ("when available"). | Attachment validation (type/extension/signature/size) shipped; scanner-service integration remains a deployment decision. |
-| I-4 | `requirements/README.md` "starts empty" placeholder. | Template boilerplate, not a requirement. |
-| I-5 | Offline stocktake undecided. | Excluded from initial release; observation provenance fields preserved for later offline queueing. |
-| I-6 | Tag vs serial-number uniqueness ambiguity. | Tags globally unique forever (BR-001, DB-enforced, `409 DUPLICATE_TAG`); serial uniqueness configurable per category; warning-level duplicate detection otherwise. |
-| I-7 | Dashboard targets (3 s) vs 1M-event audit volumes. | Scoped aggregate endpoint + indexed/paginated feeds; N+1 guard test; `generate_volume` for planning-volume datasets. |
-| I-8 | Agent summaries/QA reports for this run are repeatedly not filed under `runs/run-a1e626552a49/cycle-*/` (observed in cycles 1 and 2); review relies on workspace inspection and a prior run's artifacts. | Standing process defect. Cycle 3 DoD makes filing summaries/reports under the current run directory a hard requirement with named file paths. |
-| I-9 | The QA/implementation environment has no Docker and no browser runner; E2E, responsive/a11y matrix, compose boot, backup drill, and perf-at-volume cannot be executed here. | Standing constraint. Tracked as BLOCKED (never silently skipped) and consolidated into the environment-limited verification register (cycle 3) for release sign-off. |
-| I-10 | **(Rev 1.2)** The newly committed `backend/uv.lock` resolved Django 6.1 / DRF 3.18.0, but all executed backend evidence was gathered on Django 6.0.7 / DRF 3.17.1 (`backend/README.md` still cites 6.0.7). | Cycle 3 must run the full gate suite against the frozen lock set and update the README's verified-versions claim; if incompatibilities appear, constrain the lock to Django 6.0.x per stack doc §4 rule 4 and record an ADR. |
-
-### 2.3 Open questions deferred to the product owner (do not block the build)
-
-Tag format/label dimensions beyond the default (`AST-000001`, QR, 50×25 mm label), final permission matrix per organization, notification channels and timing, retention periods, RTO/RPO confirmation, whether logical assets (licenses) are enabled, live HR/finance integrations. Defaults are chosen in this design and are configurable.
+**Version verification rule (from stack doc §4.4):** at implementation start, Backend/Frontend agents verify Nuxt 4 ↔ Node LTS and Django 6.0 ↔ DRF ↔ Python compatibility. If a recommended major version is not mutually supported, use the newest mutually supported stable major and record the reason in `ASSUMPTIONS.md` (repo root) and an ADR.
 
 ---
 
-## 3. Personas and User Journeys
+## 3. Assumptions and Unresolved Questions
 
-Personas (from `specification.md` §5): **System Administrator**, **Asset Manager**, **Department Manager**, **Inventory Operator/Technician**, **Employee/Custodian**, **Auditor (read-only)**.
+**Assumptions (design decisions made by Team Lead):**
+1. Internal organizational use; English-only UI; Unicode storage; i18n-ready string handling.
+2. **Authentication default:** Django session-cookie auth (HttpOnly, Secure, SameSite=Lax) with CSRF protection is the shipped mechanism. A local-dev login page plus seed users provide access. OIDC SSO is an integration point (mozilla-django-oidc behind `OIDC_ENABLED` settings flag), documented but not enabled without product-owner IdP details.
+3. **Offline stocktake is excluded** from this release (Could Have; open decision in layout.md §32). Scanner UX always offers manual tag entry.
+4. **Malware scanning:** pluggable `AttachmentScanner` interface; default implementation validates type/signature/size only. A real scanner is wired via settings when the organization provides one.
+5. **Charts:** lightweight, project-owned accessible SVG/CSS chart components (bar/donut with text summaries and data-table alternative). No heavy chart dependency; avoids dark-theme/accessibility risk.
+6. **Mobile bottom navigation:** Home, Assets, Scan, Tasks, More (per layout.md §6.3 recommendation).
+7. **Hosting platform:** container images + Compose for dev; production deployment documented generically (reverse proxy TLS, separate web/worker/beat, managed PostgreSQL). Specific platform TBD by product owner.
+8. Approval workflows, notification channels beyond in-app, and email are configurable and may be disabled; defaults: approvals required for disposal and write-off only; email disabled until SMTP configured.
+9. Planning volumes per NFR-006: 100k assets, 5k users, 250 concurrent users, 1M lifecycle/audit events, 25k-row imports.
 
-The five user journeys in `specification.md` §11 (register-and-assign, transfer between offices, stocktake, repair-and-return-to-service, retire-and-dispose) plus sign-in/deep-link (J-6) are the canonical E2E test scenarios. All are implemented at API level with executed tests; browser-level E2E remains environment-blocked (I-9).
-
----
-
-## 4. Functional Requirements and Acceptance Criteria
-
-Requirement IDs `REQ-F001`–`REQ-F030` map 1:1 to `specification.md` FR-001–FR-030; acceptance criteria are inherited verbatim from the source and are not weakened. Business rules BR-001–BR-010 become `REQ-B001`–`REQ-B010`. Design elaborations below add the implementation contract.
-
-### 4.1 Core lifecycle rules (design elaboration)
-
-- **Asset creation (F003):** `POST /api/v1/assets/` validates category-configured required fields; the tag is server-generated when omitted (or validated for uniqueness when supplied); duplicate detection runs via `POST /api/v1/assets/check-duplicates/` (and the edit-time variant) returning candidate warnings — never auto-merging (BR-008). Draft save allowed with `status=Draft`. Create response shape: `201 {"asset": {...}, "warnings": [...]}`.
-- **Transitions:** `LifecycleStatus.allowed_transitions` is evaluated in the service layer; invalid transition → `409 STATUS_TRANSITION_INVALID`. Controlled transitions require `reason` and, when the transition rule sets `requires_approval`, return `202 {"approval": {...}}` and mutate nothing until the approval decision executes atomically.
-- **Concurrency (BR-009):** mutable entities carry `version`; updates send `If-Match: <version>` or `version` in the body; stale → `409 VERSION_CONFLICT`; missing → `400`. UI offers a reload-and-review flow.
-- **Idempotency (D-08):** `Idempotency-Key` supported on asset create and all lifecycle/transition POSTs (assign, transfer, return, reserve, maintenance create, stocktake observation, retire/dispose/reopen). Same key + same payload within 24 h replays the original response; key reuse with a different payload → `409 IDEMPOTENCY_KEY_REUSED`. Verified by executed replay tests.
-
-### 4.2 Notifications (F023)
-
-In-app notification center (`GET /notifications`, mark-read idempotent, own-only isolation), per-user preferences with mandatory compliance types non-mutable (`400` on mute attempt), dedupe per event, daily warranty/maintenance reminder task. Email is sent only when SMTP is configured; delivery failures are logged without content. **Evidence gap (carried to cycle 3):** the SMTP send/failure path needs a locmem-backend test.
-
-### 4.3 Stocktake (F022)
-
-`StocktakeSession` snapshots expected items at start; operators record observations (scan or manual); the reconciliation service computes found / not-found / unexpected / duplicate-scan / moved / condition-mismatch; master-data updates apply only after authorized review, each emitting lifecycle + audit events; closing requires permission and retains the variance report. Offline queueing excluded (I-5) with provenance fields preserved.
-
-### 4.4 Import/export (F018/F019)
-
-Imports: template → upload → server-side parse/validate (cells as text, no formula execution) → preview with row/field errors → commit with explicit duplicate policy (`reject|update|create`) and partial-success policy → auditable result file (created/updated/skipped/failed). Exports: honor active filters and field permissions, CSV UTF-8 with formula-injection mitigation (dangerous leading characters prefixed), audited, asynchronous for large volumes via Celery with job status.
+**Unresolved questions for product owner (do not block build):** final permission matrix detail, tag format/label spec, supported currencies, retention periods, RTO/RPO confirmation, IdP choice, whether logical assets (licenses) are enabled, offline stocktake need. Defaults are chosen above and recorded here.
 
 ---
 
-## 5. Non-Functional Requirements
+## 4. Personas and User Journeys
 
-`REQ-N001`–`REQ-N014` map to `specification.md` NFR-001–NFR-014. Design specifics:
+Personas (mapped to Django groups, see §11): System Administrator, Asset Manager, Department Manager, Inventory Operator/Technician, Employee/Custodian, Auditor (read-only).
 
-- **Performance (NFR-004 refined):** p75 dashboard < 3 s, p75 filtered search < 2 s, p75 asset detail < 2 s, interaction feedback < 500 ms on the planning baseline (100k assets). Delivered mitigations: indexed queries, list endpoint N+1-bounded by test (≤5 queries), `generate_volume` for volume datasets. Full perf-at-volume run remains environment-blocked (I-9).
-- **Availability (NFR-005):** stateless web processes, `/healthz/` + `/readyz/` (the only unauthenticated endpoints), transactional integrity for all multi-record lifecycle writes.
-- **Localization (NFR-014):** English catalog, i18n-ready structure; UTC storage, ISO 8601 transport, client-locale rendering; money = decimal string + ISO 4217.
-- **Browser support (NFR-013):** latest two stable majors of Edge/Chrome/Firefox/Safari — verification environment-blocked (I-9).
-
----
-
-## 6. Page Inventory and Navigation
-
-Role-aware navigation; inaccessible modules are hidden in the UI **and** denied in the API. All pages below are delivered; browser-level verification is pending (I-9).
-
-| Route | Page | Roles (minimum) | Status |
-|---|---|---|---|
-| `/login` | Sign in | public | delivered |
-| `/` | Dashboard (KPIs, ranked lists, tasks, data-quality link) | all authenticated | delivered |
-| `/assets` | Asset register (table/cards, filters, saved views, export view) | all (scoped) | delivered |
-| `/assets/new`, `/assets/[id]/edit` | Create/edit asset | Operator+ | delivered |
-| `/assets/[id]` | Asset detail (identity header, finance gating, tabs, full activity feed) | all (scoped, field-restricted) | delivered |
-| `/assets/[id]/assign`, `/transfer`, `/return` | Workflow forms/dialogs | Operator+ | delivered |
-| `/scan` | Scanner (qr-scanner + BarcodeDetector fallback) + manual entry | Operator+ | delivered (camera path browser-blocked) |
-| `/reservations` | Reservations list with overdue filters | Operator+ | delivered |
-| `/maintenance` | Maintenance work queue | Operator+ | delivered |
-| `/stocktakes`, `/stocktakes/[id]` | Stocktake list/session/count/reconcile/close | Manager/Operator | delivered |
-| `/approvals` | Approval inbox (pending/history, decision dialogs) | Dept Manager+ | delivered |
-| `/reports`, `/reports/[type]` | Reports catalog (14 types) + viewer | per report permission | delivered |
-| `/imports`, `/exports` | Bulk jobs (wizard, async status, result files) | Manager/Operator | delivered |
-| `/notifications` | Notification center + preferences | all | delivered |
-| `/data-quality` | Data-quality work queue (errors vs warnings) | Manager/Operator | delivered |
-| `/admin/*` | Users, reference data, transition rules, audit search, retention policy | Admin | delivered (API verified; UI browser-blocked) |
-| `/help`, `/403`, `/404`, `/error` | Support pages | public/authenticated | delivered |
-
-Navigation: desktop persistent collapsible sidebar; tablet collapsed icons/drawer; mobile bottom nav (Home, Assets, Scan, Tasks, More) + drawer. Breadcrumbs on desktop; mobile back action. Filters/sort/pagination in URL query params; saved views persist server-side.
+Key journeys (from specification.md §11, all must pass E2E):
+1. Register and assign a new laptop (operator → employee acknowledgement).
+2. Transfer an asset between offices (approval → In Transit → receipt confirmation).
+3. Perform a stocktake (create session → scan → variance → reconcile → close).
+4. Record repair and return to service.
+5. Retire and dispose of an asset (blocked checks → approval → disposal evidence).
 
 ---
 
-## 7. Responsive and Accessibility Requirements
+## 5. Functional Requirements (with acceptance criteria)
 
-- Breakpoints (guidance): 320–479, 480–767, 768–1023, 1024–1439, ≥1440. Usable at 320 px without page-level horizontal scroll; 200% zoom; touch targets ≥ 44×44 px; safe-area insets; dialogs become full-screen sheets on compact screens.
-- Desktop asset list = data table (sticky header, sortable, keyboard-reachable actions); mobile = summary cards. No harmful infinite scroll.
-- WCAG 2.2 AA: skip link, landmarks, logical tab order, visible focus ring, focus containment/restoration in modals, Escape dismissal, associated labels/errors, live-region announcements, no color-only meaning (icon + text badges — unit-tested), reduced-motion support.
-- QA matrix (layout.md §30): the 8-viewport × 10-page-type matrix remains the acceptance standard; it is currently **environment-blocked** (I-9) and will be consolidated in the cycle-3 verification register.
+Source FRs are normative (specification.md §9). The design refines them into contracts below; acceptance criteria in the source document apply unchanged.
+
+| Design ref | Source | Design summary |
+|---|---|---|
+| D-FR-001 | FR-001 Auth | Session login/logout/me endpoints; unauthenticated API → 401 `AUTH_REQUIRED`; generic login failure message; security audit event on login. |
+| D-FR-002 | FR-002 AuthZ | Role + organizational-scope (department/location) checks in every endpoint via DRF permission classes + scoped querysets; 403 `PERMISSION_DENIED` without data leakage; field-level restrictions for financial/personal fields via serializer field gating. |
+| D-FR-003 | FR-003 Create | `POST /assets/` with category-driven required-field validation, server-side tag generation (`AST-` + zero-padded sequence, configurable), duplicate warning endpoint (`/assets/duplicate-check/`), draft save, atomic create + lifecycle event + audit. |
+| D-FR-004 | FR-004 View/Edit | Asset detail aggregates identity, current assignment, warranty, location; PATCH with `version` optimistic concurrency → 409 `VERSION_CONFLICT`; field-level edit rules; change audit with before/after. |
+| D-FR-005 | FR-005 Search | `GET /assets/` supports `search` (tag, serial, name, model, custodian name, location), filters (category, status, condition, department, location, custodian, supplier, warranty_state, dates), ordering, pagination; exact tag match → `GET /assets/by-tag/{tag}` for scan/deep link. |
+| D-FR-006 | FR-006 Saved views | `/saved-views/` CRUD; `is_shared` restricted to authorized roles; per-user default flag. |
+| D-FR-007 | FR-007 Assign | `POST /assets/{id}/assign/` — validates assignable status, closes prior active assignment in one transaction, sets status Assigned, optional acknowledgement tracking; lifecycle + audit events. |
+| D-FR-008 | FR-008 Transfer | `POST /assets/{id}/transfer/` creates Transfer record (origin, destination, reason, requester); if approval configured → ApprovalRequest; on approval asset → In Transit; `POST /transfers/{id}/confirm-receipt/` closes old assignment, opens new, restores status. |
+| D-FR-009 | FR-009 Return | `POST /assets/{id}/return/` captures condition, damage/missing accessories, destination; closes assignment; resulting status per rules (Available / Under Maintenance / Retired). |
+| D-FR-010 | FR-010 Reservation | `/reservations/` with period-conflict validation (DB exclusion constraint on overlapping active reservations per asset), checkout/return/cancel/expire transitions; overdue flag computed and filterable. |
+| D-FR-011 | FR-011 Maintenance | `/maintenance-records/`; start may set asset Under Maintenance; completion restores allowed status, sets last/next maintenance dates; attachments allowed. |
+| D-FR-012 | FR-012 Warranty | `warranty_state` filter (active/expiring_30/expiring_60/expiring_90/expired), Celery-beat daily job creates notifications; report + export. |
+| D-FR-013 | FR-013 Exceptions | `POST /assets/{id}/report-exception/` (missing/lost/stolen/damaged) with evidence; status change; resolution recorded as new event, never edit of original. |
+| D-FR-014 | FR-014 Retire/Dispose | `retire` and `dispose` actions; BR-006 block checks (active assignment/reservation/transfer/open maintenance) unless approved exception; disposal terminal; reopen requires admin + justification (new corrective event). |
+| D-FR-015 | FR-015 Attachments | Metadata in PostgreSQL, bytes in object storage; presigned/time-limited download URLs via backend authorization check; type/size/signature validation; audited upload/download/delete. |
+| D-FR-016 | FR-016 Notes | `/assets/{id}/notes/`; author+timestamp; edits create superseding note (original retained); visibility per role. |
+| D-FR-017 | FR-017 Barcode/QR | QR encodes asset deep-link URL `/scan/{tag}`; label print view (light print CSS); browser scanning via camera with manual fallback; unknown code → clear non-destructive result. |
+| D-FR-018 | FR-018 Import | Celery-based CSV import wizard: template download → upload → validate (UTF-8, formula-injection neutralization on read) → preview with row/field errors → policy (reject/update/create; partial allowed) → commit (idempotent via job + idempotency key) → result file. Max 25k rows. |
+| D-FR-019 | FR-019 Export | Async CSV export respecting filters + field permissions; UTF-8 BOM; formula-injection mitigation (prefix `'` on leading `= + - @`); job status polling; audited. |
+| D-FR-020 | FR-020 Dashboard | `GET /dashboard/summary/` returns scoped KPIs (total, by status, by category, assigned/unassigned, overdue returns, maintenance due, warranty expiring, missing, recent activity) + `generated_at`. |
+| D-FR-021 | FR-021 Reports | `/reports/{name}/` for the 14 default reports; filters + date ranges; totals computed from same scoped queryset as lists (reconciliation guaranteed); export when authorized. |
+| D-FR-022 | FR-022 Stocktake | Session (scope, locations, operators, dates, snapshot at start) → items expected list frozen at start → observations (scan or manual; time, operator, location, condition, note/image) → computed outcomes (found, missing, unexpected, duplicate, moved, condition_mismatch) → review + apply reconciliation (transactional) → close with variance report. |
+| D-FR-023 | FR-023 Notifications | In-app notification center (unread/history, mark-read); Celery beat jobs for due-date/expiry/overdue events with dedupe key; email channel behind SMTP config; mandatory vs optional classes. |
+| D-FR-024 | FR-024 Approvals | Generic ApprovalRequest (target content-type/id, requester, reason, payload snapshot, status, decision, comments); separation-of-duties check (`requester != approver` when enabled); immutable history. |
+| D-FR-025 | FR-025 Audit | Append-only `audit_events` table (no update/delete via app); actor, action, target, before/after JSON, correlation_id, outcome, timestamp; restricted search/export. |
+| D-FR-026 | FR-026 Reference data | `/reference-data/{type}/` admin CRUD; deactivate-not-delete for in-use values; ordering + description; audited. |
+| D-FR-027 | FR-027 User admin | `/admin/users/` list/role+scope assignment/activate/deactivate; guard against removing last active system admin; audited; secrets never displayed. |
+| D-FR-028 | FR-028 Data quality | Nightly Celery job + on-save checks populate `data_quality_issues` (missing required, invalid refs, duplicates, expired assignments, inconsistent lifecycle); severity error/warning; work-queue endpoint + resolve action. |
+| D-FR-029 | FR-029 Activity feed | `GET /assets/{id}/activity/` merges lifecycle events, assignments, transfers, maintenance, stocktake observations, notes — reverse chronological, permission-filtered. |
+| D-FR-030 | FR-030 Archive | `record_status` active/archived; archive action with eligibility checks; no hard delete of operational records; retention config documented. |
 
 ---
 
-## 8. Theme and Visual Design
+## 6. Non-Functional Requirements
 
-Dark theme is the default and only required theme; tokens exactly per `layout.md` §5.2 implemented as Tailwind `@theme` tokens — never hard-coded per component; dark `color-scheme` set in SSR head (no unthemed flash). Status presentation: icon + text label + semantic treatment. Typography: system sans-serif, 16 px body, 14 px minimum, monospace for identifiers. Print styles: light background, no chrome, scannable codes at label size (50×25 mm QR label delivered; output evidence spot-check in cycle 3). **Deviation (delivered):** hand-rolled accessible components instead of the Nuxt UI library — explicitly permitted by layout.md §31; ADR-002.
+| Design ref | Source | Design commitment |
+|---|---|---|
+| D-NFR-001 | NFR-001 Usability | Consistent terminology, grouped forms, explicit confirmations, full state coverage (loading/empty/success/warning/error). |
+| D-NFR-002 | NFR-002 Responsive | Breakpoints per layout.md §4; no page-level horizontal scroll ≥320px; card lists on mobile. |
+| D-NFR-003 | NFR-003 Accessibility | WCAG 2.2 AA; axe-core in E2E; manual keyboard checklist per critical journey. |
+| D-NFR-004 | NFR-004 Performance | **Targets (p95, at planning volumes, test env = Compose stack):** dashboard < 3s, filtered search < 2s, asset detail < 2s, interaction feedback < 500ms; imports/exports/reports async. Indexed query paths per §10.4. |
+| D-NFR-005 | NFR-005 Reliability | Multi-record mutations in DB transactions; idempotent jobs with bounded retries; `/health/live` and `/health/ready`. Availability target 99.5% is a production-platform concern (documented). |
+| D-NFR-006 | NFR-006 Scalability | Schema + indexes sized for 100k assets / 1M events; pagination caps; jobs for bulk work. |
+| D-NFR-007 | NFR-007 Security | See §12. |
+| D-NFR-008 | NFR-008 Privacy | Minimal personal data (name, email, department); field-level gating; no production data in dev seeds. |
+| D-NFR-009 | NFR-009 Auditability | Append-only audit; correlation IDs propagated Nuxt → Django → Celery. |
+| D-NFR-010 | NFR-010 Maintainability | Status transitions, category attributes, notification timing configurable via DB/admin; migrations versioned; settings externalized. |
+| D-NFR-011 | NFR-011 Observability | Structured JSON logs (timestamp, severity, service, correlation_id); no secrets/PII in logs; metrics endpoints documented. |
+| D-NFR-012 | NFR-012 Backup | Documented pg_dump + object-storage backup procedure; RTO ≤ 8h / RPO ≤ 24h initial target; restore test procedure documented. |
+| D-NFR-013 | NFR-013 Browsers | Latest two majors of Edge/Chrome/Firefox/Safari; Playwright matrix covers Chromium/Firefox/WebKit. |
+| D-NFR-014 | NFR-014 Localization | English UI; all user strings via constants; ISO 8601 API dates; locale-aware display formatting; Unicode storage. |
 
 ---
 
-## 9. Frontend Architecture
+## 7. Page Inventory and Navigation
 
-### 9.1 Stack and structure
+Routes (Nuxt file-based). All authenticated routes client-rendered (`ssr: false` for the app shell) except sign-in/help which may SSR. No confidential data in public payload caches.
 
-Nuxt 4 + Vue 3 Composition API + TypeScript strict, `<script setup lang="ts">`, Tailwind CSS v4, ESLint flat config, Vitest + Vue Test Utils (101 tests green at Rev 1.2), Playwright + axe-core specs authored (environment-blocked). **Deviation:** npm + `package-lock.json` instead of pnpm (ADR-001).
+| Route | Page | Roles |
+|---|---|---|
+| `/login` | Sign in | public |
+| `/` | Dashboard (KPIs, charts, tasks, alerts, recent activity) | all |
+| `/assets` | Asset register (table desktop / cards mobile, filters, saved views) | all scoped |
+| `/assets/new` | Create asset | Operator+ |
+| `/assets/[id]` | Asset detail: Overview, Assignment, Maintenance, Documents, Activity, Audit* tabs | scoped |
+| `/assets/[id]/edit` | Edit asset | Operator+ |
+| `/scan` | Scanner + manual tag entry | Operator+ (all for lookup) |
+| `/scan/[tag]` | Scan resolution → asset or unknown-code state | scoped |
+| `/assignments` | Assignments & transfers work queue | Operator+ |
+| `/maintenance` | Maintenance dashboard (open/scheduled/history) | Operator+ |
+| `/stocktakes`, `/stocktakes/[id]` | Stocktake list and session (progress, scan, variance) | Manager/Operator |
+| `/approvals` | Pending approvals | approvers |
+| `/reports`, `/reports/[name]` | Report catalog and viewer | scoped |
+| `/imports`, `/exports` | Import wizard, export jobs | Manager+ |
+| `/notifications` | Notification center | all |
+| `/admin` (users, reference-data, statuses, categories, attributes, notification rules) | Administration | Admin |
+| `/my-assets` | Employee's assigned assets + report actions | Employee |
+| `/help` | Help/shortcut reference | all |
+| `/403`, `/404`, error pages | Error states | all |
 
-### 9.2 Rendering strategy
+Navigation: desktop persistent collapsible sidebar; tablet icon/drawer; mobile top bar + bottom nav (Home, Assets, Scan, Tasks, More) + drawer. Role-aware items; hiding is UX-only — backend enforces. Breadcrumbs on desktop nested pages; mobile back action. Deep links resume after login.
 
-SSR shell + client-only private data fetching; no private inventory data rendered into SSR payloads; `/login`, `/help`, error pages may SSR.
+---
+
+## 8. Responsive and Accessibility Requirements
+
+- Breakpoints (guidance): 320–479, 480–767, 768–1023, 1024–1439, ≥1440. Content-driven; usable at 320px without horizontal scroll; 200% zoom without loss of function.
+- Desktop: 12-column grid, sticky table headers, max readable form widths, side summary panels for wizards.
+- Mobile: single column, labels above inputs, sticky bottom action bars where safe, full-screen sheets for dialogs/filters, 44×44px touch targets, safe-area insets, no hover-only behavior.
+- Dark theme tokens from layout.md §5.2 implemented as Tailwind theme tokens (single source in `frontend/app.config.ts` + CSS variables); no unthemed flash (inline theme script / default-dark HTML class); status = icon + label + semantic color, never color alone; pure black/white avoided on large areas.
+- Typography: system sans stack, 16px body (14px metadata minimum), monospace for tags/serials, sentence case.
+- Accessibility: semantic landmarks, skip link, focus-visible ring token, focus trap + restore in modals, Escape dismissal, aria-live for toasts/results, chart text alternatives + data tables, `prefers-reduced-motion` respected, errors associated to fields + summary with focus management.
+- Print: light-background print stylesheet for labels, asset summary, receipts (assignment/transfer), stocktake report, disposal record; QR remains scannable.
+
+---
+
+## 9. Frontend Design
+
+### 9.1 Architecture
+- `frontend/` Nuxt 4 + TS strict, `<script setup lang="ts">`, ESLint, Vitest + Vue Test Utils, Playwright (in `testcase/`).
+- Feature-based organization under `features/` (dashboard, assets, assignments, maintenance, stocktakes, imports, reports, notifications, approvals, admin, auth) plus `components/ui` primitives.
+
+### 9.2 Component hierarchy (per layout.md §31)
+```
+AppShell
+├── AppSidebar / MobileBottomNavigation / AppTopBar (GlobalAssetSearch, NotificationCenter, user menu)
+└── <NuxtPage>
+    ├── PageHeader (breadcrumb, title, primary action, overflow)
+    ├── DashboardPage → KpiCard, AccessibleChartPanel, TaskList, ActivityList
+    ├── AssetsPage → FilterBar/FilterDrawer (chips), AssetTable (desktop) / AssetCardList (mobile), PaginationBar, SavedViewMenu
+    ├── AssetDetailPage → AssetIdentityHeader, AssetStatusBadge, tab panels, AssetActivityTimeline, StickyActionBar
+    ├── AssetFormPage → ResponsiveFormSection(s), DuplicateWarningDialog, ConfirmActionDialog
+    ├── workflow dialogs → AssignDialog, TransferDialog (From/To compare), ReturnDialog, MaintenanceDialog, RetireDisposeWizard
+    ├── StocktakeSessionPage → StocktakeProgress, ScannerPanel, VarianceList
+    ├── ImportWizard (8 steps per layout.md §17.1)
+    └── shared: EmptyState, InlineAlert, FullScreenMobileSheet, ErrorState, Skeleton loaders
+```
 
 ### 9.3 State management
+- `useState`/composables default; Pinia stores only for: session/user, notification badge count, saved-view cache. Server data via composables (`useAssets`, `useAsset`, …) wrapping the typed client; no duplicated server state across stores.
+- Filters/pagination/sort in URL query params (bookmarkable); list→detail→back preserves position via query.
+- Theme: dark-only class strategy; token CSS variables.
 
-Typed service modules + composables (`useAuth`, `usePermissions`, `useReferenceData`, `useAssetFilters`, `useSavedViews`, `useToast`) over a single API client; backend is the source of truth; filters/pagination in URL query params.
+### 9.4 API client
+- `utils/apiClient.ts` around `$fetch`: base URL from runtime config (`API_BASE_URL`), injects `X-CSRFToken` (from cookie) and `X-Correlation-ID` (uuid per request, propagated), maps error envelope to typed `ApiError` (code, message, field_errors, correlation_id), 401 → redirect to `/login?next=`, no retry of non-idempotent requests unless `Idempotency-Key` set (auto-generated for create/action posts).
+- TypeScript types generated from backend OpenAPI (openapi-typescript) into `types/api.d.ts`; CI validates drift.
 
-### 9.4 API client contract (delivered as `useApi`)
-
-One configurable base URL, `X-Correlation-ID` per request, `X-CSRFToken` on unsafe methods, credentials included, 15 s timeout, **GET-only retry** (unsafe methods never retried — pairs with Idempotency-Key), error envelope → typed `ApiError`, 401 → session-expired redirect preserving deep link.
-
-### 9.5 Component hierarchy
-
-AppShell (sidebar/bottom-nav/topbar), PageHeader, KpiCard, AssetTable/AssetCardList, badges, FilterBar/Drawer, AssetIdentityHeader, AssetActivityTimeline, form sections, StickyActionBar, ConfirmActionDialog, sheets, workflow forms — delivered as project-specific accessible components (ADR-002).
-
-### 9.6 Frontend testing
-
-Vitest suite (101 tests: error mapping, filters, badges, empty/alert/pagination, scan states, reservation/report logic, activity timeline and offline-state additions from cycle 2). Playwright E2E specs authored but environment-blocked (I-9).
+### 9.5 Forms and feedback
+- Required marked with text+asterisk; client validation mirrors server rules but server is canonical; failed submit → error summary + focus first invalid; values preserved; unsaved-changes guard; submit disabled while pending (loading button keeps width); success → toast + resulting record link; destructive actions → ConfirmActionDialog naming asset + consequence with action-specific button text.
 
 ---
 
-## 10. Backend Architecture
+## 10. Backend Design
 
-### 10.1 Stack and project layout
+### 10.1 Project layout (per stack doc §7.2)
+`config/settings/{base,local,test,production}.py`; apps: `accounts`, `assets`, `assignments`, `maintenance`, `stocktakes`, `reporting`, `notifications`, `audit`, `reference_data`, plus `core` (middleware, pagination, errors, permissions) and `files` (attachments). Business rules in `services.py` per app (transactions here); serializers = representation + boundary validation; no business side effects in signals.
 
-Django 6.x + DRF + Python ≥3.12 + Psycopg 3; drf-spectacular OpenAPI (committed `backend/openapi.json` with drift-guard test); Celery + Redis (eager fallback in local/test); django-storages for S3-compatible production storage, local media in dev; Argon2 password hashing. **`backend/uv.lock` is committed (Rev 1.2)**; Docker builds use `uv sync --frozen`. Locked versions (Django 6.1 / DRF 3.18.0) are pending regression verification (I-10). Apps: `core`, `accounts`, `reference_data`, `assets`, `assignments`, `maintenance`, `stocktakes`, `bulk`, `approvals`, `notifications`, `audit`, `reporting`.
+### 10.2 Data model (key entities; all have `id` UUID public PK, `created_at`, `updated_at`; money = `DecimalField` + `currency CharField(3)`; timestamps `timestamptz` UTC)
 
-### 10.2 Service boundaries
+- **accounts.User** (extends AbstractUser): email unique, display_name, role (M2M Group), department_scope (M2M Department, empty = all per role), is_active.
+- **reference_data:** Department, Location (site/building/floor/room fields, hierarchical self-FK optional), CostCenter, Supplier, Category(parent self-FK for subcategory, required_fields JSONB config), StatusDefinition(key, label, is_terminal, allowed_transitions JSONB, active), ConditionDefinition, DisposalMethod, MaintenanceType, AttributeDefinition(category FK, key, label, field_type, required, options JSONB, restricted bool).
+- **assets.Asset:** asset_tag (unique, immutable), name, description, category FK, serial_number (index), manufacturer, brand, model, status FK, condition FK, department FK, location FK, custodian FK(User, null), cost_center FK, supplier FK, acquisition_type, purchase_date, purchase_price+currency (restricted), po_reference, invoice_reference, warranty_provider/start/end, service_contract_ref/end, last_maintenance_at, next_maintenance_due, expected_life_end, retired_at, disposed_at, disposal_method/reason, parent_asset self-FK, barcode_value, external_source/external_id (unique together, null allowed), category_attributes JSONB (validated against AttributeDefinition), data_quality_status, record_status (active/archived), **version IntegerField** (optimistic concurrency), created_by/updated_by.
+- **assignments.Assignment:** asset FK, custodian FK, department FK, location FK, assigned_at, expected_return_at, returned_at, status (active/closed), acknowledgement_required/acknowledged_at/acknowledged_by, notes. Partial unique index: one active assignment per asset.
+- **assignments.Transfer:** asset FK, from_custodian/from_location, to_custodian/to_location, reason, requested_by, status (pending_approval/in_transit/completed/cancelled/rejected), approval FK, requested_at/completed_at, evidence.
+- **assignments.Reservation:** asset FK, requester, start_at, end_at, purpose, status (reserved/checked_out/returned/cancelled/expired); exclusion constraint preventing overlapping active periods per asset.
+- **assets.LifecycleEvent:** asset FK, event_type, actor FK, at, from_status, to_status, summary, payload JSONB, correlation_id.
+- **maintenance.MaintenanceRecord:** asset FK, type FK, issue, technician/provider, started_at, completed_at, cost+currency (restricted), result, notes, status(open/completed/cancelled).
+- **approvals.ApprovalRequest:** content_type/object_id (generic), requester, approver, reason, payload_snapshot JSONB, status (pending/approved/rejected/returned), decided_at, comments.
+- **stocktakes.StocktakeSession:** name, scope JSONB (locations/departments/categories), operators M2M, start/due dates, status (draft/active/reconciling/closed), snapshot_at, instructions. **StocktakeItem:** session, asset, expected_location, outcome. **StocktakeObservation:** session, asset(nullable for unknown), tag_scanned, observed_by, observed_at, observed_location, observed_condition, note, image FK.
+- **files.Attachment:** asset FK (+ generic FK for maintenance/disposal evidence), storage_key, original_name (sanitized), content_type, size, uploaded_by, scan_status, created_at.
+- **assets.Note:** asset FK, author, body, created_at, superseded_by self-FK.
+- **notifications.Notification:** user FK, type, title, body, link, dedupe_key (unique), read_at, created_at, channel log.
+- **audit.AuditEvent:** actor FK (+service_name), action, target_type/target_id, before JSONB, after JSONB, correlation_id, outcome, at. Append-only (DB revoke UPDATE/DELETE for app role documented; app never issues them).
+- **assets.SavedView:** user FK, name, config JSONB, is_shared, is_default.
+- **jobs.ImportJob / ExportJob:** user, file/storage_key, status (queued/processing/completed/failed), policy JSONB, result_summary JSONB, result_file_key, idempotency_key unique, correlation_id, timestamps.
+- **assets.DataQualityIssue:** asset FK, rule_key, severity, message, status(open/resolved), detected_at, resolved_by/at.
 
-Serializers = representation + boundary validation. Multi-record lifecycle behavior in explicit services under `transaction.atomic()` with row locking where invariants require it; every transition emits `LifecycleEvent` + `AuditEvent` atomically. No business side effects in signals.
+### 10.3 Migrations and seed data
+- One initial migration per app; constraints (unique asset_tag, partial unique active assignment, check constraints for date ordering where expressible, e.g. warranty_end ≥ warranty_start).
+- `seed-dev.sh` runs a management command creating: groups/permissions for the 6 roles; default statuses (13 per spec §8.1) with transition map; conditions (6); demo departments (3), locations (2 sites), cost centers, suppliers, categories (Laptop, Monitor, Phone, Furniture, Vehicle-equipment) with attribute definitions; users `admin`, `manager`, `operator`, `deptmanager`, `employee`, `auditor` (password `change-me-dev` documented, dev only); ~50 sample assets with assignments, maintenance, one stocktake. No real personal data.
 
-### 10.3 Cross-cutting
+### 10.4 Indexing
+Indexes on: asset_tag (unique), serial_number, (status), (condition), (category), (custodian), (department), (location), warranty_end, next_maintenance_due, created_at/updated_at, (external_source, external_id); trigram (`pg_trgm`) indexes on name/serial/asset_tag for search; assignments (asset, status) partial; audit (target_type, target_id), (at).
 
-- Correlation-ID middleware (`X-Correlation-ID` accepted/generated, echoed, attached to logs and errors).
-- Error envelope: `{"error": {code, message, field_errors, correlation_id, retryable}}`.
-- Pagination: `?page=&page_size=` (default 25, max 100), envelope `{count, next, previous, results}`.
-- **Audit trail is hash-chained:** each `AuditEvent` links to its predecessor via SHA-256; `verify_chain()` detects tampering; no mutation surface in the API schema.
-- Rate limiting via working scoped throttles (`ScopedSimpleRateThrottle`; login 429 `RATE_LIMITED`, search/import/export).
-- Structured logging; Celery jobs idempotent with bounded retries and persisted status.
-
----
-
-## 11. Data Model
-
-All entities: UUID PK, `created_at`/`created_by`, `updated_at`/`updated_by`, `version` where mutable; tz-aware UTC timestamps.
-
-### 11.1 Core entities (delivered)
-
-- **User** (custom) with role + organizational scope (departments/locations); scopeless operators see only assets they custody. Roles: `admin`, `asset_manager`, `dept_manager`, `operator`, `employee`, `auditor`.
-- **Reference data:** Category (subcategories, required-fields config, serial-uniqueness flag), LifecycleStatus (allowed transitions, requires_reason/approval flags), Condition, Location (site→building→floor→room), Department, CostCenter, Supplier, DisposalMethod, MaintenanceType. **In-use values deactivate, never hard-delete (BR-004)** — test-verified; deactivations audited.
-- **Asset:** full attribute set per spec §7.2 (identity, ownership, location, lifecycle, purchase, warranty/service, technical, category attributes JSON validated against category definitions, governance incl. `legal_hold`). Tag globally unique across all states; `AssetTagSequence` generates `AST-000001`-form tags.
-- **Assignment:** one active primary assignment per asset via partial unique index (BR-002), acknowledgement tracking, expected-return/overdue handling.
-- **LifecycleEvent:** immutable, typed, actor + correlation ID, from/to status.
-- **AuditEvent:** append-only, hash-chained, before/after snapshots (sensitive fields masked), service identities supported.
-- **Operations entities (delivered):** MaintenanceRecord, Reservation (overdue identification via `overdue=true`), ExceptionReport, ApprovalRequest (separation of duties, immutable decisions), StocktakeSession + ExpectedItem + Observation, Attachment (validated, authorized downloads), Note, Notification + Preference, SavedView, ImportJob/ExportJob, DataQualityIssue queue.
-
-### 11.2 Indexes and constraints
-
-Unique asset tag; per-category serial uniqueness; partial unique active assignment; indexes on status, condition, custodian, department, location, warranty end, next maintenance due, updated_at; trigram-supported global search with exact-tag-first ranking; lifecycle/audit (asset, timestamp) indexes. Date-consistency constraints (BR-005) at DB and service layers.
-
-### 11.3 Migrations and seed data
-
-Django migrations only; drift guard test. `seed_dev` idempotent: 13 statuses, 6 conditions, ≥8 departments, ≥12 locations, 6 demo users (env-provided passwords), 200 assets with history. `generate_volume` creates planning-volume datasets.
+### 10.5 Service boundaries and transactions
+- `assets/services.py`: create_asset, update_asset (version check), change_status (validates transition map, reason/approval requirements), retire, dispose (BR-006 checks).
+- `assignments/services.py`: assign, initiate_transfer, confirm_receipt, return_asset, reserve/checkout — each `@transaction.atomic`, closing prior assignment, writing LifecycleEvent + AuditEvent in the same transaction.
+- `stocktakes/services.py`: start (snapshot expected items), record_observation (idempotent per session+tag), compute_variance, apply_reconciliation (reviewed updates only), close.
+- `reporting/services.py`: shared scoped querysets reused by dashboard/reports/exports to guarantee reconciliation.
+- `notifications/services.py`: emit(type, users, payload, dedupe_key) — insert-or-ignore; beat jobs call this.
+- `jobs/services.py`: import pipeline (parse → validate → preview → commit), export pipeline; idempotent via job id + unique idempotency keys; bounded Celery retries with backoff.
 
 ---
 
-## 12. API Contracts (v1)
+## 11. API Contracts (summary — canonical contract = generated OpenAPI)
 
-Base: `/api/v1/` with **DRF-standard trailing slashes on all endpoints**. JSON in/out; ISO 8601 datetimes; money `{"amount": "1234.56", "currency": "USD"}`; related resources write as UUID strings and read as compact objects; error/pagination envelopes per §10.3; idempotency and concurrency per §4.1.
+**Conventions:** base `/api/v1/`; JSON; list envelope `{ "results": [...], "page": 1, "page_size": 25, "count": 1234 }` (default 25, max 200); errors use the stack-doc envelope `{ "error": { code, message, field_errors, correlation_id } }`; ISO 8601 datetimes with TZ; money `{ "amount": "1234.56", "currency": "USD" }`; mutation POSTs accept `Idempotency-Key` (replay returns stored response, 24h); PATCH requires `version` in body → stale = 409 `VERSION_CONFLICT`; stable error codes (`AUTH_REQUIRED`, `PERMISSION_DENIED`, `VALIDATION_ERROR`, `NOT_FOUND`, `VERSION_CONFLICT`, `ASSET_STATUS_TRANSITION_INVALID`, `ASSET_NOT_ASSIGNABLE`, `DISPOSAL_BLOCKED`, `DUPLICATE_TAG`, `RESERVATION_CONFLICT`, `IMPORT_VALIDATION_FAILED`, `RATE_LIMITED`, …).
 
-Endpoint families (authoritative contract = committed `backend/openapi.json`, drift-guarded):
+**Endpoint groups:**
+- `POST /auth/login/`, `POST /auth/logout/`, `GET /auth/me/`, `GET /auth/csrf/`
+- `GET|POST /assets/`, `GET|PATCH /assets/{id}/`, `GET /assets/by-tag/{tag}/`, `POST /assets/duplicate-check/`
+- `POST /assets/{id}/assign|transfer|return|retire|dispose|report-exception|archive/`
+- `GET /assets/{id}/activity/`, `GET|POST /assets/{id}/notes/`, `GET|POST|DELETE /assets/{id}/attachments/`, `GET /attachments/{id}/download/` (authorized, redirect to time-limited URL)
+- `GET /assignments/`, `GET /transfers/`, `POST /transfers/{id}/confirm-receipt/`, `GET|POST /reservations/`, `POST /reservations/{id}/checkout|return|cancel/`
+- `GET|POST /maintenance-records/`, `POST /maintenance-records/{id}/complete/`
+- `GET|POST /stocktakes/`, `GET /stocktakes/{id}/`, `POST /stocktakes/{id}/start|close/`, `POST /stocktakes/{id}/observations/`, `GET /stocktakes/{id}/variance/`, `POST /stocktakes/{id}/reconcile/`
+- `GET /approvals/`, `POST /approvals/{id}/approve|reject|return/`
+- `GET|POST /saved-views/`, `PATCH|DELETE /saved-views/{id}/`
+- `GET|POST /imports/`, `GET /imports/{id}/`, `GET /imports/template/`, `GET /imports/{id}/result/`
+- `POST /exports/`, `GET /exports/{id}/`, `GET /exports/{id}/download/`
+- `GET /dashboard/summary/`, `GET /reports/`, `GET /reports/{name}/`
+- `GET /notifications/`, `POST /notifications/{id}/read/`, `POST /notifications/read-all/`
+- `GET|POST /reference-data/{type}/`, `PATCH|DELETE /reference-data/{type}/{id}/`
+- `GET|POST /admin/users/`, `PATCH /admin/users/{id}/`
+- `GET /audit-events/` (Admin/Auditor only), `GET /data-quality/`, `POST /data-quality/{id}/resolve/`
+- `GET /health/live/`, `GET /health/ready/` (public, minimal)
 
-| Family | Notes |
-|---|---|
-| `/auth/login/`, `/auth/logout/`, `/auth/csrf/`, `/auth/me/` | Session auth; `me` returns profile, role, scopes, capabilities (incl. `finance.view`) |
-| `/assets/` CRUD, `/assets/check-duplicates/`, transitions, assign/transfer/return, retire/dispose/reopen, activity, attachments, notes, QR label | No DELETE on asset detail (archive only); approval-gated actions return 202 |
-| `/reservations/` | Incl. `overdue=true` filter |
-| `/maintenance/`, `/stocktakes/…`, `/approvals/` + decide actions, `/imports/`, `/exports/`, `/notifications/` + preferences, `/saved-views/` | Same conventions |
-| `/dashboard/summary/` | Scoped KPIs with `generated_at`; non-misleading totals |
-| `/reports/` catalog (14 types) + `/reports/{type}/` | Scoped, finance-gated, date filters, audited CSV export with injection mitigation |
-| `/reference/{kind}/` | Admin write; deactivate-not-delete |
-| `/admin/users/`, `/admin/audit-events/` | `409 LAST_ADMIN` guard; audit read restricted (`audit.read`) |
-| `/healthz/`, `/readyz/` | Only unauthenticated endpoints |
+Status codes: 200/201/204; 400 VALIDATION_ERROR; 401; 403; 404; 409; 429; 500 (generic message + correlation_id only).
 
-Stable error codes include: `VALIDATION_FAILED`, `PERMISSION_DENIED`, `NOT_FOUND` (no existence leak), `VERSION_CONFLICT`, `STATUS_TRANSITION_INVALID`, `DUPLICATE_TAG`, `IDEMPOTENCY_KEY_REUSED`, `DISPOSAL_BLOCKED`, `APPROVAL_ALREADY_DECIDED`, `SEPARATION_OF_DUTIES`, `LAST_ADMIN`, `RATE_LIMITED`.
+---
+
+## 12. Security, Privacy, Logging, Error Handling
+
+- Transport: HTTPS outside dev; HSTS, secure headers middleware; restrictive CSP (no inline scripts beyond nonce'd theme bootstrap); CORS explicit allowlist; CSRF on cookie-authenticated mutations (double-submit via `X-CSRFToken`).
+- Sessions: HttpOnly/Secure/SameSite=Lax cookies, 8h idle timeout (configurable), rotation on login; expired → 401 → UI redirect. Never tokens in localStorage.
+- Rate limiting (Redis-backed) on login, search, import/export, scan-lookup.
+- Input: server-side validation everywhere; ORM parameterization; CSV formula-injection mitigation in/out; upload type+signature+size validation; filenames sanitized; downloads authorized per request.
+- Output: Vue auto-escaping; no `v-html` on user data; API errors never leak stack traces/paths/settings; generic 500 with correlation_id.
+- Secrets: `.env.example` only names/placeholders; production settings fail fast on missing/insecure values; DEBUG off in production; ALLOWED_HOSTS/CSRF trusted origins explicit.
+- Privacy: employee PII limited to name/email/department; financial fields (purchase_price, costs, proceeds) gated by `view_financials` permission at serializer level and excluded from exports/reports when unauthorized.
+- Logging: structured JSON via `structlog`-style config (timestamp, level, service, correlation_id from `X-Correlation-ID` middleware, user id hash); correlation ID created at Nuxt, forwarded to Celery tasks; PII/secrets masked; audit events (business) kept separate from diagnostic logs.
 
 ---
 
 ## 13. Frontend/Backend Integration Rules
 
-1. Django owns business rules, authorization, persistence, canonical validation; Nuxt owns presentation and usability-level validation.
-2. The committed OpenAPI schema is the contract: frontend types are generated from it; a drift-guard test fails on schema changes; breaking changes require a new version path.
-3. Correlation IDs propagate Nuxt → Django → Celery; surfaced in UI error states as the support reference.
-4. No secrets in frontend runtime config.
-5. UI maps `field_errors` onto form fields, shows an error summary, and moves focus on failed submit; entered values preserved.
-6. Unsafe-method retries only with `Idempotency-Key` (frontend never auto-retries non-GET).
+1. Django = source of truth for rules, authZ, persistence, canonical validation. Nuxt = presentation, UX validation, feedback.
+2. OpenAPI schema generated (`./manage.py spectacular --file openapi.yaml`), committed to `backend/openapi.yaml`; frontend types regenerated; CI fails on unchecked drift.
+3. Only the typed client calls the API; components never fetch directly.
+4. List pagination/filter metadata consistent; filters mirrored in URL query.
+5. Correlation IDs both directions; user-facing unexpected errors show the ID.
+6. Non-idempotent retries only with Idempotency-Key.
+7. Optimistic UI allowed only for low-risk reversible actions (e.g., note add); lifecycle/assignment/transfer/approval/stocktake/disposal wait for confirmed backend result.
+8. Breaking API change → `/api/v2/`; deprecation documented.
 
 ---
 
-## 14. Security, Privacy, Logging, Error Handling
+## 14. Testing Strategy and Traceability
 
-- **Transport/headers:** HTTPS outside dev; secure headers + restrictive CSP (test-verified); CORS explicit allowlist, non-reflecting; `DEBUG=False` and fail-fast production settings (raises on missing/insecure env, short secrets, or local auth without double opt-in).
-- **AuthN/Z:** HttpOnly/Secure/SameSite session cookies, session-key rotation on login, CSRF enforced (reject/accept tested), login rate limiting, generic failure messages, authorization on every endpoint; horizontal/vertical escalation tested; field-level finance gating (`finance.view`) enforced in serializers and exports.
-- **Uploads:** type/extension/signature/size validation; randomized storage keys; authorized downloads.
-- **Data protection:** no secrets in code/logs/browser storage/exports; CSV formula-injection mitigation; least-privilege DB role; Unicode throughout.
-- **Auditability:** hash-chained append-only audit with actor/action/before-after/correlation/outcome; read restricted; correlation IDs across tiers.
-- **Error handling:** stable codes; user-safe messages with recovery guidance; correlation ID on unexpected errors; retryable flag; partial bulk failures reported row-by-row.
-- **Dependency governance (Rev 1.2):** DEF-104 **resolved by fix** — `happy-dom` bumped to `^20.11.2`, `npm audit fix` executed, re-audit reports 0 vulnerabilities (documented in `frontend/README.md`); QA re-captures the audit output as closure evidence in cycle 3.
+**Backend (pytest, pytest-django, factory_boy; PostgreSQL in CI):** model/constraint tests, service unit tests (transitions, BR rules, transactions), serializer validation, API integration incl. authZ matrix (each role × endpoint, horizontal/vertical escalation), OpenAPI contract test, concurrency (stale version, double-assign), import/export (valid/invalid/duplicate/Unicode/large), attachment authZ, audit completeness, job idempotency. Quality gates: ruff format/check, mypy, `makemigrations --check`, `check --deploy`, pytest.
 
----
+**Frontend (Vitest + Vue Test Utils):** composables, api client error mapping, key components (AssetStatusBadge, FilterBar, forms, dialogs) with state coverage (loading/empty/error/unauthorized); `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`.
 
-## 15. Authentication Design
+**E2E/QA (Playwright, `testcase/`):** journeys J1–J5 (§4); auth flows; permission matrix spot checks via UI + direct API; axe-core accessibility scans per page + keyboard walkthrough; responsive matrix per layout.md §30 (8 viewport sizes × core pages); scanner manual-fallback; import/export round-trip; evidence (screenshots/traces) stored under `testcase/evidence/`.
 
-1. **Mechanism:** Django session auth; login sets HttpOnly/Secure/SameSite cookie; CSRF cookie via `GET /auth/csrf/`; Argon2 hashing; seed users via env-provided passwords only.
-2. **OIDC seam:** auth isolated behind `accounts` backends and settings (`OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` optional). No tokens in `localStorage` in either mode.
-3. **Session policy:** configurable idle expiry with rotation on login; expired sessions → 401 → client redirect to `/login?next=…&reason=expired`.
-4. **Authorization model:** role capabilities + object/organizational scope checks in `core.permissions`; field-level restrictions per serializer; UI hides but API denies.
+**Traceability:** test IDs prefixed by area — `QA-E2E-###` (journeys/pages), `QA-A11Y-###`, `QA-RESP-###`, `BE-API-###`, `BE-SVC-###`, `FE-UT-###`. The QA agent maintains `testcase/traceability.md` mapping REQ-ids → test IDs. No test marked passed without executed evidence.
 
 ---
 
-## 16. Local Dev, Build, Deploy, Operations
+## 15. Local Development, Build, Deploy, Operations
 
-- **Compose (ADR-006):** canonical `compose.yaml` and `.env.example` live under `backend/`; `scripts/dev-up.sh` auto-copies them to the repo root when absent (non-clobber). Services: `frontend`, `backend`, `postgres` (18-alpine, healthchecked), `redis`, `celery-worker`, `celery-beat`.
-- **Scripts:** `dev-up.sh`, `migrate.sh`, `seed-dev.sh`, `check.sh` (ruff/mypy/migration-check/deploy-check/pytest), `export-openapi.sh`, `backup.sh`/`restore.sh` (production-guarded), `dev-down.sh` — idempotent, fail-fast, environment-labelled.
-- **Reproducible installs (Rev 1.2):** `backend/uv.lock` committed; Docker build uses `uv sync --frozen`. Frontend uses `package-lock.json`.
-- **Quality gates (executed green at adoption; re-execution against the frozen lock set is the cycle-3 gate):** backend 155 pytest + ruff + mypy (django-stubs); frontend 101 Vitest + lint + typecheck + Nuxt build; OpenAPI drift guard.
-- **Backup/recovery:** `backend/docs/BACKUP_RESTORE.md` (scope/schedule/encryption/drill checklist/audit-chain verification step/RTO≤8 h–RPO≤24 h mapping) + scripts; the restore drill itself is environment-blocked (I-9) and tracked as MANUAL.
-
----
-
-## 17. Testing Strategy and Traceability
-
-Levels: backend unit/service/constraint → API integration (permissions, envelope, pagination, concurrency, idempotency replay) → OpenAPI contract → frontend unit/component → Playwright E2E (authored, environment-blocked) → non-functional (perf/a11y/responsive/security). A test is never marked PASSED without executed evidence. QA maintains per-requirement mapping in `testcase/`; blocked items are explicitly BLOCKED with reasons, never silently skipped.
-
-**Evidence state at Rev 1.2:** API/unit-level PASS evidence exists for all 30 FRs, all 10 BRs, and most stack requirements. Cycle-2 closures: DEF-104 (npm audit clean), DEF-103 (uv.lock). Outstanding verification: gates re-execution against the locked dependency set (I-10), activity-feed union and email-path tests, and the environment-blocked set (I-9) to be consolidated in `testcase/verification-register.md`.
+- Root scripts (idempotent, fail-fast, env-labeled): `scripts/dev-up.sh` (compose up), `scripts/migrate.sh`, `scripts/seed-dev.sh`, `scripts/check.sh` (all lint/type/test gates), `scripts/dev-down.sh`.
+- Compose services: frontend (Nuxt dev, :3000), backend (Django, :8000), postgres:18, redis, celery-worker, celery-beat, optional minio.
+- Backend quality: `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy .`, `uv run python manage.py makemigrations --check --dry-run`, `uv run python manage.py check --deploy` (with safe CI settings), `uv run pytest`.
+- Frontend quality: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm test:e2e`.
+- Production (documented): immutable OCI images (non-root), ASGI server for Django (uvicorn/gunicorn-uvicorn), Nuxt node server behind reverse proxy with TLS, separate web/worker/beat, managed PostgreSQL with encrypted backups + PITR, migration as controlled release step, S3 bucket private with presigned access, health/readiness endpoints, centralized logs + alerts. RTO ≤ 8h, RPO ≤ 24h target; restore procedure tested and documented in README/ops docs.
+- Docs required at completion: root README (setup/commands), env-var reference, authZ explanation, ADRs for any stack deviation, `ASSUMPTIONS.md` for version fallbacks.
 
 ---
 
-## 18. Definition of Done
+## 16. Definition of Done (this project)
 
-Feature-level and release-level DoD as in `specification.md` §18, plus stack DoD (`front-back-end-stack.md` §19). Release-gating items for cycle 3: (1) all gates re-executed green against the locked dependency set with evidence filed under this run; (2) no unresolved Critical/High defects — DEF-104 fix verified by QA; (3) environment-blocked verification items presented in the register for an explicit product-owner risk decision.
+Per specification.md §18 plus stack doc §19: acceptance criteria implemented; authZ enforced UI + API; validation/loading/empty/error states done; audit events recorded; automated tests added and executed with evidence; accessibility + responsive verified against the layout.md §29–30 matrices; docs updated; no unresolved critical/high defects without recorded risk decision; all quality-gate commands pass.
 
 ---
 
-## 19. Revision History
+## 17. Requirement Traceability
 
-| Date | Cycle | Change |
+Maintained in machine-readable form by the Team Lead (`requirements_json` each cycle: REQ-1…REQ-30 = FR-001…FR-030; REQ-31…REQ-40 = BR-001…BR-010; REQ-41…REQ-54 = NFR-001…NFR-014; REQ-55…REQ-61 = layout requirements; REQ-62…REQ-71 = stack requirements; REQ-72+ = deferred/decisions). QA mirrors this in `testcase/traceability.md`.
+
+---
+
+## 18. Revision History
+
+| Rev | Cycle | Changes |
 |---|---|---|
-| 2025-01-01 (cycle 1) | 1 | Initial design baseline authored from `specification.md`, `layout.md`, `front-back-end-stack.md`. Established: three-cycle delivery plan; session-cookie auth with OIDC seam (I-2); version-fallback policy (I-1); attachment-scanner interface (I-3); offline stocktake excluded with sync-ready schema (I-5); global tag uniqueness + per-category serial uniqueness (I-6); data model, API v1 contract, error/pagination/idempotency/concurrency conventions; dark-theme token adoption; page inventory and component hierarchy; testing and traceability strategy. |
-| 2025-01-08 (cycle 1 review) | 1→2 | **Review revision.** This run's cycle-1 agent summaries were absent (I-8); review reconciled against the workspace's existing full implementation and executed QA evidence from run `run-1c738338ee96` (backend 155 pytest, frontend 88 Vitest, all gates green). Design updated to the delivered contract: trailing slashes; create response `{asset, warnings}`; approval-gated `202`; hash-chained audit; deactivate-not-delete reference data; scoped-throttle rate limiting; ADR register added (§20). I-8/I-9 recorded. Open items carried: DEF-104, DEF-103/uv.lock, FR-029/FR-023 evidence gaps, duplicate QA test ID. Cycle 2 re-planned as verification/disposition/hardening. |
-| 2025-01-15 (cycle 2 review) | 2→3 | **Review revision.** Cycle-2 summaries again not filed (I-8 persists — made a hard cycle-3 DoD item). Verified by workspace inspection: **DEF-104 closed** (happy-dom `^20.11.2` + `npm audit fix` → 0 vulnerabilities; documented in `frontend/README.md`; frontend suite now 101 tests) and **DEF-103/ADR-003 closed** (`backend/uv.lock` committed; `uv sync --frozen` builds). New risk **I-10**: lockfile resolved Django 6.1/DRF 3.18 while test evidence is on 6.0.7/3.17.1 — cycle 3 must re-verify gates against the frozen set or constrain the lock. Still outstanding: FR-029 activity-union and FR-023 email-path tests, duplicate TC-ID renumber, verification register, this run's own evidence chain. Cycle 3 planned as final verification/evidence-consolidation/release-readiness cycle; no new features. |
-
----
-
-## 20. Architecture Decision Register (summary)
-
-| ADR | Decision | Rationale / status |
-|---|---|---|
-| ADR-001 | npm + `package-lock.json` instead of pnpm | Only npm on the environment allowlist; scripts remain pnpm-compatible. Accepted. |
-| ADR-002 | Hand-rolled accessible components instead of Nuxt UI library | Permitted by layout.md §31; keeps §5.2 token palette exact. Accepted. |
-| ADR-003 | ~~`backend/uv.lock` not committed~~ → **uv.lock committed (cycle 2)** | Resolved (DEF-103). Locked set pending regression verification (I-10). |
-| ADR-004 | Idempotency-Key on all create/transition POSTs | Delivered and test-verified. |
-| ADR-005 | Resolved versions: Django 6.x, DRF 3.x, psycopg 3.3, Celery 5.6, Python ≥3.12 | Within stack baseline via §4 rule 4; exact locked versions pending cycle-3 verification (I-10). |
-| ADR-006 | Canonical `compose.yaml`/`.env.example` under `backend/` with `dev-up.sh` auto-copy to root | Agent write scopes cannot create root files; bootstrap preserved non-clobbering. Accepted. |
-| ADR-007 | DEF-104 dispositioned by dependency fix (`happy-dom ^20.11.2`, `npm audit fix` → 0 vulnerabilities) | Fix preferred over risk acceptance; QA captures audit output as closure evidence in cycle 3. |
+| 1.0 | Cycle 1 (initial design) | First complete design synthesized from specification.md, layout.md, front-back-end-stack.md. Resolved open decisions: local session auth default with OIDC integration point; offline stocktake deferred; pluggable attachment scanner (validate-only default); lightweight accessible custom charts; Home/Assets/Scan/Tasks/More bottom nav; container-based hosting with platform TBD; defined p95 performance targets per NFR-004; defined data model, API surface, service boundaries, and 3-cycle delivery split. No contradictions found between source documents; noted version-verification fallback (stack doc §4.4) for Nuxt 4 / Django 6.0 / PostgreSQL 18 compatibility. |
