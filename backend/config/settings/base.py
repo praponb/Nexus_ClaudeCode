@@ -238,7 +238,7 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "Versioned REST API for the Asset Inventory Web Application.",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
-    "SERVE_PERMISSIONS": ["rest_framework.permissions.AllowAny"],
+    "SERVE_PERMISSIONS": ["rest_framework.permissions.IsAuthenticated"],
     "COMPONENT_SPLIT_REQUEST": True,
 }
 

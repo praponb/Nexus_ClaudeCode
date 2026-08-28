@@ -15,6 +15,7 @@ class User(AbstractUser):
         OPERATOR = "operator", "Inventory Operator"
         EMPLOYEE = "employee", "Employee"
         AUDITOR = "auditor", "Auditor"
+        VIEWER = "viewer", "Viewer"
 
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     role = models.CharField(max_length=32, choices=Role.choices, default=Role.EMPLOYEE)

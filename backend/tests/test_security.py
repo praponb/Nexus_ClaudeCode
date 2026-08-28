@@ -279,3 +279,51 @@ def test_asset_search_is_throttled(api_client, make_user, monkeypatch):
     for _ in range(2):
         assert api_client.get("/api/v1/search/assets/?q=abc").status_code == 200
     assert api_client.get("/api/v1/search/assets/?q=abc").status_code == 429
+
+
+def test_viewer_reads_every_asset_but_cannot_write(api_client, make_user, make_asset, reference):
+    """The public demo role: global read of the register, no write.
+
+    `viewer` is not in ASSET_WRITE_ROLES, so writes deny by omission.
+    """
+    make_asset("VIEW-001")
+    make_asset("VIEW-002", department=reference.other_department)
+    viewer = make_user("demo-viewer", "viewer")
+    api_client.force_authenticate(viewer)
+
+    listed = api_client.get("/api/v1/assets/")
+    assert listed.status_code == 200
+    # Global read: not filtered to the viewer's own department/custody.
+    assert listed.json()["count"] == 2
+
+    created = api_client.post(
+        "/api/v1/assets/",
+        {
+            "name": "Should not exist",
+            "category": str(reference.category.uuid),
+            "status": str(reference.draft.uuid),
+            "condition": str(reference.condition.uuid),
+        },
+        format="json",
+    )
+    assert created.status_code == 403
+
+
+def test_viewer_cannot_read_the_audit_log(api_client, make_user):
+    """AuditEvent rows carry client IPs, so the public demo role must not see them."""
+    viewer = make_user("demo-viewer-audit", "viewer")
+    api_client.force_authenticate(viewer)
+    assert api_client.get("/api/v1/admin/audit-events/").status_code == 403
+
+
+def test_viewer_has_no_finance_or_admin_capability(make_user):
+    from apps.core import capabilities
+
+    viewer = make_user("demo-viewer-caps", "viewer")
+    granted = capabilities.ROLE_CAPABILITIES["viewer"]
+
+    assert capabilities.is_global_reader(viewer) is True
+    assert capabilities.can_view_finance(viewer) is False
+    assert capabilities.can_write_assets(viewer) is False
+    for withheld in ("finance.view", "audit.read", "asset.create", "asset.edit", "user.admin"):
+        assert withheld not in granted

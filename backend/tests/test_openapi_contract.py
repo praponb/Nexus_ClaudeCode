@@ -113,9 +113,16 @@ def test_asset_delete_is_rejected_with_envelope(api_client, authed, make_user, r
     assert response.json()["error"]["code"] == "METHOD_NOT_ALLOWED"
 
 
-def test_schema_endpoint_served(api_client):
-    response = api_client.get("/api/v1/schema/?format=json")
-    assert response.status_code == 200
+def test_schema_endpoint_requires_authentication(api_client, make_user):
+    """The site is publicly reachable, so the spec is not.
+
+    An anonymous OpenAPI dump would hand out a map of every endpoint, parameter
+    and model to anyone who asks; signed-in users and tooling still get it.
+    """
+    assert api_client.get("/api/v1/schema/?format=json").status_code == 401
+
+    api_client.force_authenticate(make_user("schema-reader", "viewer"))
+    assert api_client.get("/api/v1/schema/?format=json").status_code == 200
 
 
 def test_committed_openapi_json_is_current():

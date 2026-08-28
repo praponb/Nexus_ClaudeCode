@@ -4,7 +4,7 @@ Capabilities are surfaced to the frontend via /auth/me for UI hiding only; the
 backend re-enforces authorization on every endpoint.
 """
 
-GLOBAL_READ_ROLES = frozenset({"system_admin", "asset_manager", "auditor"})
+GLOBAL_READ_ROLES = frozenset({"system_admin", "asset_manager", "auditor", "viewer"})
 ASSET_WRITE_ROLES = frozenset({"system_admin", "asset_manager", "operator"})
 FINANCE_ROLES = frozenset({"system_admin", "asset_manager", "auditor"})
 
@@ -64,6 +64,18 @@ ROLE_CAPABILITIES: dict[str, list[str]] = {
         "audit.read",
         "dashboard.view",
         "search",
+        "report.export",
+    ],
+    # Read-only role for the public demo: global read of the register, but
+    # deliberately no audit.read (AuditEvent stores client IPs), no finance.view,
+    # and no write capability -- ASSET_WRITE_ROLES and FINANCE_ROLES both exclude
+    # it, so those deny by omission rather than needing new checks.
+    "viewer": [
+        "asset.read",
+        "reference.read",
+        "dashboard.view",
+        "search",
+        "savedview.manage",
         "report.export",
     ],
 }

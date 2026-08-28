@@ -3362,14 +3362,15 @@
         "type": "string"
       },
       "RoleEnum": {
-        "description": "* `system_admin` - System Administrator\n* `asset_manager` - Asset Manager\n* `department_manager` - Department Manager\n* `operator` - Inventory Operator\n* `employee` - Employee\n* `auditor` - Auditor",
+        "description": "* `system_admin` - System Administrator\n* `asset_manager` - Asset Manager\n* `department_manager` - Department Manager\n* `operator` - Inventory Operator\n* `employee` - Employee\n* `auditor` - Auditor\n* `viewer` - Viewer",
         "enum": [
           "system_admin",
           "asset_manager",
           "department_manager",
           "operator",
           "employee",
-          "auditor"
+          "auditor",
+          "viewer"
         ],
         "type": "string"
       },
