@@ -1,7 +1,6 @@
 from django.contrib import admin
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView
-from rest_framework.permissions import AllowAny
 
 from apps.core.health import LivenessView, ReadinessView
 
@@ -21,9 +20,5 @@ urlpatterns = [
     path("api/v1/", include("apps.assets.urls")),
     path("api/v1/", include("apps.reporting.urls")),
     path("api/v1/", include("apps.audit.urls")),
-    path(
-        "api/v1/schema/",
-        SpectacularAPIView.as_view(permission_classes=[AllowAny]),
-        name="openapi-schema",
-    ),
+    path("api/v1/schema/", SpectacularAPIView.as_view(), name="openapi-schema"),
 ]

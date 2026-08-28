@@ -22,8 +22,6 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
 
   redis:
     image: redis:7-alpine
@@ -37,13 +35,13 @@ services:
   backend:
     build:
       context: ./backend
-      target: dev
+      target: ${BACKEND_BUILD_TARGET:-dev}
     restart: unless-stopped
     environment:
-      APP_ENV: local
+      APP_ENV: ${APP_ENV:-local}
       DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-config.settings.local}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-local-dev-only-not-a-secret}
-      DJANGO_DEBUG: "${DJANGO_DEBUG:-true}"
+      DJANGO_DEBUG: "${DJANGO_DEBUG:-false}"
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
       DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-http://localhost:3000}
       DJANGO_CORS_ALLOWED_ORIGINS: ${DJANGO_CORS_ALLOWED_ORIGINS:-http://localhost:3000}
@@ -52,17 +50,21 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-asset_inventory}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-dev-password}
       POSTGRES_HOST: postgres
+      POSTGRES_SSLMODE: ${POSTGRES_SSLMODE:-disable}
       POSTGRES_PORT: "5432"
       CELERY_BROKER_URL: redis://redis:6379/1
       CELERY_RESULT_BACKEND: redis://redis:6379/2
+      CACHE_URL: ${CACHE_URL:-redis://redis:6379/3}
+      TRUSTED_CLIENT_IP_HEADER: ${TRUSTED_CLIENT_IP_HEADER:-}
+      LOCAL_AUTH_ALLOW_IN_PRODUCTION: "${LOCAL_AUTH_ALLOW_IN_PRODUCTION:-false}"
       CELERY_TASK_ALWAYS_EAGER: ${CELERY_TASK_ALWAYS_EAGER:-false}
-      LOCAL_AUTH_ENABLED: "true"
+      LOCAL_AUTH_ENABLED: "${LOCAL_AUTH_ENABLED:-true}"
       MEDIA_ROOT: /app/media
       SEED_DEMO_PASSWORD: ${SEED_DEMO_PASSWORD:-}
     volumes:
       - backend_media:/app/media
     ports:
-      - "${BACKEND_PORT:-8000}:8000"
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -72,19 +74,28 @@ services:
   celery-worker:
     build:
       context: ./backend
-      target: dev
+      target: ${BACKEND_BUILD_TARGET:-dev}
     command: celery -A config worker --loglevel=INFO
     restart: unless-stopped
     environment:
-      APP_ENV: local
+      APP_ENV: ${APP_ENV:-local}
       DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-config.settings.local}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-local-dev-only-not-a-secret}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-http://localhost:3000}
+      DJANGO_CORS_ALLOWED_ORIGINS: ${DJANGO_CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
+      LOCAL_AUTH_ENABLED: "${LOCAL_AUTH_ENABLED:-true}"
       POSTGRES_DB: ${POSTGRES_DB:-asset_inventory}
       POSTGRES_USER: ${POSTGRES_USER:-asset_inventory}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-dev-password}
       POSTGRES_HOST: postgres
+      POSTGRES_SSLMODE: ${POSTGRES_SSLMODE:-disable}
       CELERY_BROKER_URL: redis://redis:6379/1
       CELERY_RESULT_BACKEND: redis://redis:6379/2
+      CACHE_URL: ${CACHE_URL:-redis://redis:6379/3}
+      TRUSTED_CLIENT_IP_HEADER: ${TRUSTED_CLIENT_IP_HEADER:-}
+      LOCAL_AUTH_ALLOW_IN_PRODUCTION: "${LOCAL_AUTH_ALLOW_IN_PRODUCTION:-false}"
       MEDIA_ROOT: /app/media
     volumes:
       - backend_media:/app/media
@@ -97,19 +108,28 @@ services:
   celery-beat:
     build:
       context: ./backend
-      target: dev
+      target: ${BACKEND_BUILD_TARGET:-dev}
     command: celery -A config beat --loglevel=INFO
     restart: unless-stopped
     environment:
-      APP_ENV: local
+      APP_ENV: ${APP_ENV:-local}
       DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-config.settings.local}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-local-dev-only-not-a-secret}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-http://localhost:3000}
+      DJANGO_CORS_ALLOWED_ORIGINS: ${DJANGO_CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
+      LOCAL_AUTH_ENABLED: "${LOCAL_AUTH_ENABLED:-true}"
       POSTGRES_DB: ${POSTGRES_DB:-asset_inventory}
       POSTGRES_USER: ${POSTGRES_USER:-asset_inventory}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-dev-password}
       POSTGRES_HOST: postgres
+      POSTGRES_SSLMODE: ${POSTGRES_SSLMODE:-disable}
       CELERY_BROKER_URL: redis://redis:6379/1
       CELERY_RESULT_BACKEND: redis://redis:6379/2
+      CACHE_URL: ${CACHE_URL:-redis://redis:6379/3}
+      TRUSTED_CLIENT_IP_HEADER: ${TRUSTED_CLIENT_IP_HEADER:-}
+      LOCAL_AUTH_ALLOW_IN_PRODUCTION: "${LOCAL_AUTH_ALLOW_IN_PRODUCTION:-false}"
       MEDIA_ROOT: /app/media
     volumes:
       - backend_media:/app/media
@@ -122,12 +142,12 @@ services:
   frontend:
     build:
       context: ./frontend
-      target: dev
+      target: production
     restart: unless-stopped
     environment:
       NUXT_PUBLIC_API_BASE_URL: ${NUXT_PUBLIC_API_BASE_URL:-http://localhost:8000/api/v1}
     ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:3000"
     depends_on:
       backend:
         condition: service_started

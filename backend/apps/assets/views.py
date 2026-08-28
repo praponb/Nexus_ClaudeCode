@@ -37,6 +37,7 @@ from apps.audit.services import record_audit
 from apps.core.exceptions import ApiException
 from apps.core.idempotency import idempotency_key_from, run_idempotent
 from apps.core.permissions import CanCreateAsset, CanEditAsset, IsSystemAdmin, scope_assets
+from apps.core.throttling import ScopedSimpleRateThrottle
 
 logger = logging.getLogger(__name__)
 
@@ -657,10 +658,17 @@ def _search_result(asset: Asset, match: str) -> dict:
     }
 
 
+class SearchThrottle(ScopedSimpleRateThrottle):
+    """Rate limit on global search / scan lookup (NFR-007, design section 12)."""
+
+    scope = "search"
+
+
 class AssetSearchView(APIView):
     """Global search: exact tag match first, then partial matches (FR-005)."""
 
     permission_classes = [IsAuthenticated]
+    throttle_classes = [SearchThrottle]
 
     def get(self, request) -> Response:
         query = str(request.query_params.get("q", "") or "").strip()

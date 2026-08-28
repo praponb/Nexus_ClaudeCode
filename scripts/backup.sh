@@ -31,4 +31,20 @@ docker compose exec -T postgres pg_dump -U "${POSTGRES_USER}" -d "${POSTGRES_DB}
   | gzip -9 > "${DEST}"
 
 echo "==> Backup complete: ${DEST} ($(du -h "${DEST}" | cut -f1))"
+
+# Retention. Without this the directory grows without bound once the LaunchAgent
+# runs this hourly. Keep the newest BACKUP_KEEP dumps.
+BACKUP_KEEP="${BACKUP_KEEP:-48}"
+PRUNED=0
+while IFS= read -r stale; do
+  [ -n "$stale" ] || continue
+  rm -f "$stale"
+  PRUNED=$((PRUNED + 1))
+done <<EOF_PRUNE
+$(ls -1t "${DEST_DIR}"/asset-inventory-*.sql.gz 2>/dev/null | tail -n "+$((BACKUP_KEEP + 1))")
+EOF_PRUNE
+if [ "$PRUNED" -gt 0 ]; then
+  echo "==> Pruned ${PRUNED} backup(s) beyond the newest ${BACKUP_KEEP}."
+fi
+
 echo "==> Reminder: snapshot the attachment volume (backend_media) on the same schedule."

@@ -15,6 +15,7 @@ class User(AbstractUser):
         OPERATOR = "operator", "Inventory Operator"
         EMPLOYEE = "employee", "Employee"
         AUDITOR = "auditor", "Auditor"
+        VIEWER = "viewer", "Viewer"
 
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     role = models.CharField(max_length=32, choices=Role.choices, default=Role.EMPLOYEE)
@@ -69,3 +70,56 @@ class UserScope(models.Model):
     def __str__(self) -> str:
         target = self.department or self.location or self.business_unit or ""
         return f"{self.user} @ {self.scope_type}:{target}"
+
+
+class TotpDevice(models.Model):
+    """Enrolled authenticator for one user (design section 12, NFR-007).
+
+    One device per user: this is a second factor for privileged sign-in, not a
+    multi-device management feature.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="totp_device",
+    )
+    secret = models.CharField(max_length=64)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    # Time-step of the last accepted code. TOTP codes stay valid for a whole
+    # step (plus drift window), so without this the same code could be replayed
+    # by anyone who observed it inside that window.
+    last_used_step = models.BigIntegerField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def is_confirmed(self) -> bool:
+        return self.confirmed_at is not None
+
+    def __str__(self) -> str:
+        state = "confirmed" if self.is_confirmed else "pending"
+        return f"TOTP device for {self.user} ({state})"
+
+
+class MfaRecoveryCode(models.Model):
+    """Single-use fallback when the authenticator is unavailable.
+
+    Only the hash is stored, using the project's configured password hashers --
+    a recovery code is a credential, so a database read must not yield usable
+    ones.
+    """
+
+    device = models.ForeignKey(
+        TotpDevice,
+        on_delete=models.CASCADE,
+        related_name="recovery_codes",
+    )
+    code_hash = models.CharField(max_length=255)
+    used_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self) -> str:
+        return f"recovery code for {self.device.user} ({'used' if self.used_at else 'unused'})"

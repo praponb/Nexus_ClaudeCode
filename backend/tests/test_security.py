@@ -171,3 +171,159 @@ def test_reference_data_write_requires_admin(api_client, make_user, reference):
         "/api/v1/reference-data/departments/", {"code": "x", "name": "X"}, format="json"
     )
     assert created.status_code == 403
+
+
+def test_base_settings_ship_production_safe_throttle_defaults():
+    """base.py must never inherit the dev ceilings that local.py/test.py set.
+
+    Regression guard: a permissive `login` rate in base.py silently disables
+    brute-force protection in production while making the local/test overrides
+    look like harmless no-ops, which is exactly how it went unnoticed before.
+    """
+    from config.settings import base
+
+    count, _, period = base.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["login"].partition("/")
+    assert period == "minute"
+    assert int(count) <= 20
+
+
+def test_base_settings_use_a_shared_cache_for_throttle_counters():
+    """DRF stores throttle counters in the default cache (design section 12).
+
+    LocMemCache is per-process, so under the production image's
+    `gunicorn --workers 3` it would triple every configured rate and reset the
+    counters on each deploy.
+    """
+    from config.settings import base
+
+    assert "locmem" not in base.CACHES["default"]["BACKEND"].lower()
+
+
+def test_login_throttle_ignores_spoofed_forwarded_for(api_client, make_user, monkeypatch):
+    """A rotating X-Forwarded-For must not hand out fresh throttle buckets.
+
+    DRF's own get_ident() derives the bucket from the whole X-Forwarded-For
+    header when NUM_PROXIES is unset, so varying it defeated the rate limit
+    entirely. ScopedSimpleRateThrottle uses apps.core.client_ip instead.
+    """
+    from django.core.cache import cache
+
+    from apps.accounts.views import LoginThrottle
+
+    monkeypatch.setattr(LoginThrottle, "THROTTLE_RATES", {"login": "3/minute"})
+    cache.clear()
+    make_user("xff-victim", "operator")
+    for attempt in range(3):
+        response = api_client.post(
+            "/api/v1/auth/login/",
+            {"username": "xff-victim", "password": "wrong-password"},
+            format="json",
+            HTTP_X_FORWARDED_FOR=f"10.0.0.{attempt}",
+        )
+        assert response.status_code == 401
+    blocked = api_client.post(
+        "/api/v1/auth/login/",
+        {"username": "xff-victim", "password": "wrong-password"},
+        format="json",
+        HTTP_X_FORWARDED_FOR="203.0.113.99",
+    )
+    assert blocked.status_code == 429
+
+
+def test_client_ip_rejects_non_ip_values(settings):
+    """AuditEvent.ip_address is a PostgreSQL inet column.
+
+    Caller-supplied junk used to reach it via X-Forwarded-For, turning a failed
+    login into a DataError (an unauthenticated 500).
+    """
+    from django.test import RequestFactory
+
+    from apps.core.client_ip import client_ip
+
+    settings.TRUSTED_CLIENT_IP_HEADER = "HTTP_CF_CONNECTING_IP"
+    request = RequestFactory().get("/")
+
+    request.META["HTTP_CF_CONNECTING_IP"] = "not-an-ip-address"
+    request.META["REMOTE_ADDR"] = "198.51.100.7"
+    assert client_ip(request) == "198.51.100.7"
+
+    request.META["HTTP_CF_CONNECTING_IP"] = "203.0.113.5"
+    assert client_ip(request) == "203.0.113.5"
+
+    request.META["HTTP_CF_CONNECTING_IP"] = "junk"
+    request.META["REMOTE_ADDR"] = "also-junk"
+    assert client_ip(request) is None
+
+
+def test_client_ip_ignores_forwarded_for_when_no_trusted_header(settings):
+    from django.test import RequestFactory
+
+    from apps.core.client_ip import client_ip
+
+    settings.TRUSTED_CLIENT_IP_HEADER = ""
+    request = RequestFactory().get("/")
+    request.META["HTTP_X_FORWARDED_FOR"] = "1.2.3.4"
+    request.META["REMOTE_ADDR"] = "198.51.100.7"
+    assert client_ip(request) == "198.51.100.7"
+
+
+def test_asset_search_is_throttled(api_client, make_user, monkeypatch):
+    """Design section 12 requires a rate limit on search/scan lookup."""
+    from django.core.cache import cache
+
+    from apps.assets.views import SearchThrottle
+
+    monkeypatch.setattr(SearchThrottle, "THROTTLE_RATES", {"search": "2/minute"})
+    cache.clear()
+    api_client.force_authenticate(make_user("search-user", "operator"))
+    for _ in range(2):
+        assert api_client.get("/api/v1/search/assets/?q=abc").status_code == 200
+    assert api_client.get("/api/v1/search/assets/?q=abc").status_code == 429
+
+
+def test_viewer_reads_every_asset_but_cannot_write(api_client, make_user, make_asset, reference):
+    """The public demo role: global read of the register, no write.
+
+    `viewer` is not in ASSET_WRITE_ROLES, so writes deny by omission.
+    """
+    make_asset("VIEW-001")
+    make_asset("VIEW-002", department=reference.other_department)
+    viewer = make_user("demo-viewer", "viewer")
+    api_client.force_authenticate(viewer)
+
+    listed = api_client.get("/api/v1/assets/")
+    assert listed.status_code == 200
+    # Global read: not filtered to the viewer's own department/custody.
+    assert listed.json()["count"] == 2
+
+    created = api_client.post(
+        "/api/v1/assets/",
+        {
+            "name": "Should not exist",
+            "category": str(reference.category.uuid),
+            "status": str(reference.draft.uuid),
+            "condition": str(reference.condition.uuid),
+        },
+        format="json",
+    )
+    assert created.status_code == 403
+
+
+def test_viewer_cannot_read_the_audit_log(api_client, make_user):
+    """AuditEvent rows carry client IPs, so the public demo role must not see them."""
+    viewer = make_user("demo-viewer-audit", "viewer")
+    api_client.force_authenticate(viewer)
+    assert api_client.get("/api/v1/admin/audit-events/").status_code == 403
+
+
+def test_viewer_has_no_finance_or_admin_capability(make_user):
+    from apps.core import capabilities
+
+    viewer = make_user("demo-viewer-caps", "viewer")
+    granted = capabilities.ROLE_CAPABILITIES["viewer"]
+
+    assert capabilities.is_global_reader(viewer) is True
+    assert capabilities.can_view_finance(viewer) is False
+    assert capabilities.can_write_assets(viewer) is False
+    for withheld in ("finance.view", "audit.read", "asset.create", "asset.edit", "user.admin"):
+        assert withheld not in granted

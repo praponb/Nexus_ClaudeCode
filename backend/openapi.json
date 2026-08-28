@@ -3362,14 +3362,15 @@
         "type": "string"
       },
       "RoleEnum": {
-        "description": "* `system_admin` - System Administrator\n* `asset_manager` - Asset Manager\n* `department_manager` - Department Manager\n* `operator` - Inventory Operator\n* `employee` - Employee\n* `auditor` - Auditor",
+        "description": "* `system_admin` - System Administrator\n* `asset_manager` - Asset Manager\n* `department_manager` - Department Manager\n* `operator` - Inventory Operator\n* `employee` - Employee\n* `auditor` - Auditor\n* `viewer` - Viewer",
         "enum": [
           "system_admin",
           "asset_manager",
           "department_manager",
           "operator",
           "employee",
-          "auditor"
+          "auditor",
+          "viewer"
         ],
         "type": "string"
       },
@@ -5625,6 +5626,66 @@
         ],
         "tags": [
           "assignments"
+        ]
+      }
+    },
+    "/api/v1/auth/2fa/confirm/": {
+      "post": {
+        "description": "Activate a freshly enrolled authenticator and finish signing in.",
+        "operationId": "auth_2fa_confirm_create",
+        "responses": {
+          "200": {
+            "description": "No response body"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {}
+        ],
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/2fa/setup/": {
+      "post": {
+        "description": "Enrolment payload for a user who has passed the password step.\n\nReachable only with a live pending sign-in, never anonymously: the secret\nis a credential.",
+        "operationId": "auth_2fa_setup_create",
+        "responses": {
+          "200": {
+            "description": "No response body"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {}
+        ],
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/2fa/verify/": {
+      "post": {
+        "description": "Second factor for an already-enrolled user.",
+        "operationId": "auth_2fa_verify_create",
+        "responses": {
+          "200": {
+            "description": "No response body"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {}
+        ],
+        "tags": [
+          "auth"
         ]
       }
     },

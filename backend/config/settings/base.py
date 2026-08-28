@@ -120,6 +120,21 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
+# Failed-login lockout (NFR-007). LoginThrottle bounds one IP; this bounds the
+# guesses any single ACCOUNT can receive, which is what a distributed attack
+# defeats. See apps/core/login_guard.py for the DoS trade-off this accepts.
+LOGIN_LOCKOUT_THRESHOLD = int(env("LOGIN_LOCKOUT_THRESHOLD", "10") or "10")
+LOGIN_LOCKOUT_WINDOW_SECONDS = int(env("LOGIN_LOCKOUT_WINDOW_SECONDS", "900") or "900")
+# The public demo account: its password is published, so there is nothing to
+# protect, and locking it would deny every visitor at once.
+LOGIN_LOCKOUT_EXEMPT_USERNAMES = env_list("LOGIN_LOCKOUT_EXEMPT_USERNAMES", ["demo"])
+
+# Two-factor authentication (TOTP). Roles listed here must present a code at
+# sign-in; they are forced through enrolment on first login if not yet enrolled.
+# Never include the public demo role -- visitors have no enrolment path.
+MFA_REQUIRED_ROLES = env_list("MFA_REQUIRED_ROLES", ["system_admin"])
+MFA_ISSUER = env("MFA_ISSUER", "Asset Inventory") or "Asset Inventory"
+
 # Local (session-cookie) authentication is the v1 dev/test mode (design D-01).
 # Production must use OIDC SSO; local auth is hard-disabled there unless both
 # LOCAL_AUTH_ENABLED=true and LOCAL_AUTH_ALLOW_IN_PRODUCTION=true are set.
@@ -216,18 +231,30 @@ REST_FRAMEWORK = {
     # returning an unfiltered list rather than an error.
     "SEARCH_PARAM": "q",
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    # Production-safe defaults. local.py and test.py deliberately raise these
+    # ceilings for developer convenience -- do NOT copy those dev values back
+    # here: a permissive rate in base.py silently disables brute-force
+    # protection in production while making the overrides look like no-ops.
     "DEFAULT_THROTTLE_RATES": {
-        "login": "1000/minute",
-        "import_export": "1000/hour",
+        "login": "10/minute",
+        "import_export": "60/hour",
+        "search": "120/minute",
+        "mfa": "10/minute",
     },
 }
+
+# META key of a client-IP header the edge OVERWRITES on every request, used to
+# identify callers for throttling and audit. Empty means "trust nothing but
+# REMOTE_ADDR". Behind Cloudflare this is HTTP_CF_CONNECTING_IP; never point it
+# at HTTP_X_FORWARDED_FOR, which is caller-supplied. See apps/core/client_ip.py.
+TRUSTED_CLIENT_IP_HEADER = env("TRUSTED_CLIENT_IP_HEADER", "") or ""
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Asset Inventory API",
     "DESCRIPTION": "Versioned REST API for the Asset Inventory Web Application.",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
-    "SERVE_PERMISSIONS": ["rest_framework.permissions.AllowAny"],
+    "SERVE_PERMISSIONS": ["rest_framework.permissions.IsAuthenticated"],
     "COMPONENT_SPLIT_REQUEST": True,
 }
 
@@ -245,7 +272,23 @@ LOGGING = {
     "root": {"handlers": ["console"], "level": LOG_LEVEL},
 }
 
+# Cache. DRF's throttles store their counters in the *default* cache, so this
+# is what makes rate limiting real (design section 12: "Rate limiting
+# (Redis-backed)"). Django's implicit default is LocMemCache, which is
+# per-process and lost on restart -- under the production image's
+# `gunicorn --workers 3` that silently triples every configured rate and
+# resets it on each deploy. Redis db 3: 1 and 2 are the Celery broker/results.
+CACHE_URL = env("CACHE_URL") or "redis://localhost:6379/3"
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": CACHE_URL,
+    },
+}
+
 # Celery (Cycle 2+ background jobs: import/export commit, notifications).
 CELERY_BROKER_URL = env("CELERY_BROKER_URL") or env("REDIS_URL") or "redis://localhost:6379/1"
-CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND") or env("REDIS_URL") or "redis://localhost:6379/2"
+CELERY_RESULT_BACKEND = (
+    env("CELERY_RESULT_BACKEND") or env("REDIS_URL") or "redis://localhost:6379/2"
+)
 CELERY_TASK_ALWAYS_EAGER = env_bool("CELERY_TASK_ALWAYS_EAGER", APP_ENV == "local")

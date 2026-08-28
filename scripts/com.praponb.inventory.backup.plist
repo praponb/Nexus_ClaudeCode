@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Daily backup of the deployed Asset Inventory stack (NFR-012).
+
+  Install (no sudo -- this is a LaunchAgent, not a LaunchDaemon):
+
+    cp scripts/com.praponb.inventory.backup.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.praponb.inventory.backup.plist
+
+  RunAtLoad also takes one immediately at login, so a machine that was asleep
+  through its scheduled slot is not left a full day behind.
+
+  KeepAlive is deliberately absent: this is a periodic task, not a daemon. With
+  KeepAlive launchd would restart it the moment it exits and back up in a loop.
+
+  PATH must be set explicitly. launchd gives a job a minimal PATH that does not
+  include /usr/local/bin or /opt/homebrew/bin, so `docker` is not found and every
+  run fails silently except in the log.
+
+  BACKUP_KEEP bounds the directory: scripts/backup.sh prunes to the newest N.
+-->
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.praponb.inventory.backup</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>/Users/praponb/GitHub/Nexus_ClaudeCode/scripts/backup.sh</string>
+	</array>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+		<key>BACKUP_KEEP</key>
+		<string>14</string>
+	</dict>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>StartInterval</key>
+	<integer>86400</integer>
+	<key>StandardOutPath</key>
+	<string>/Users/praponb/Library/Logs/com.praponb.inventory.backup.log</string>
+	<key>StandardErrorPath</key>
+	<string>/Users/praponb/Library/Logs/com.praponb.inventory.backup.log</string>
+</dict>
+</plist>
