@@ -120,6 +120,21 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
+# Failed-login lockout (NFR-007). LoginThrottle bounds one IP; this bounds the
+# guesses any single ACCOUNT can receive, which is what a distributed attack
+# defeats. See apps/core/login_guard.py for the DoS trade-off this accepts.
+LOGIN_LOCKOUT_THRESHOLD = int(env("LOGIN_LOCKOUT_THRESHOLD", "10") or "10")
+LOGIN_LOCKOUT_WINDOW_SECONDS = int(env("LOGIN_LOCKOUT_WINDOW_SECONDS", "900") or "900")
+# The public demo account: its password is published, so there is nothing to
+# protect, and locking it would deny every visitor at once.
+LOGIN_LOCKOUT_EXEMPT_USERNAMES = env_list("LOGIN_LOCKOUT_EXEMPT_USERNAMES", ["demo"])
+
+# Two-factor authentication (TOTP). Roles listed here must present a code at
+# sign-in; they are forced through enrolment on first login if not yet enrolled.
+# Never include the public demo role -- visitors have no enrolment path.
+MFA_REQUIRED_ROLES = env_list("MFA_REQUIRED_ROLES", ["system_admin"])
+MFA_ISSUER = env("MFA_ISSUER", "Asset Inventory") or "Asset Inventory"
+
 # Local (session-cookie) authentication is the v1 dev/test mode (design D-01).
 # Production must use OIDC SSO; local auth is hard-disabled there unless both
 # LOCAL_AUTH_ENABLED=true and LOCAL_AUTH_ALLOW_IN_PRODUCTION=true are set.
@@ -224,6 +239,7 @@ REST_FRAMEWORK = {
         "login": "10/minute",
         "import_export": "60/hour",
         "search": "120/minute",
+        "mfa": "10/minute",
     },
 }
 

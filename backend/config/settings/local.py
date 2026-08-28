@@ -37,6 +37,7 @@ REST_FRAMEWORK = {
         "login": "1000/minute",
         "import_export": "1000/hour",
         "search": "1000/minute",
+        "mfa": "1000/minute",
     },
 }
 

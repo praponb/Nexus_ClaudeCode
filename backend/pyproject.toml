@@ -20,6 +20,7 @@ dependencies = [
     "celery[redis]>=5.4,<6",
     "django-storages>=1.14,<2",
     "qrcode>=7.4,<9",
+    "pyotp>=2.9,<3",
     "uvicorn[standard]>=0.30",
     "gunicorn>=22",
 ]
