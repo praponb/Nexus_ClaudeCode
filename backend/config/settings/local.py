@@ -5,7 +5,7 @@ it is NOT a secret and must never be used outside local development.
 """
 
 from config.settings.base import *  # noqa: F401,F403
-from config.settings.base import env, env_list
+from config.settings.base import REST_FRAMEWORK, env, env_list
 
 DEBUG = True
 
@@ -27,6 +27,25 @@ CSRF_COOKIE_SECURE = False
 
 LOCAL_AUTH_ENABLED = True
 
-REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["login"] = "1000/minute"
-REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["import_export"] = "1000/hour"
+# Dev-only ceilings so local iteration is never rate-limited. Rebuilt rather
+# than mutated in place: the old `REST_FRAMEWORK[...][...] = ...` form edited
+# base.py's dict object itself, which would leak these permissive rates into
+# any other settings module importing base in the same process.
+REST_FRAMEWORK = {
+    **REST_FRAMEWORK,
+    "DEFAULT_THROTTLE_RATES": {
+        "login": "1000/minute",
+        "import_export": "1000/hour",
+        "search": "1000/minute",
+    },
+}
 
+# base.py points the default cache (where DRF keeps throttle counters) at Redis.
+# Keep bare-metal `manage.py runserver` working without a Redis on localhost --
+# the compose stack overrides CACHE_URL and uses the real thing.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "asset-inventory-local",
+    },
+}

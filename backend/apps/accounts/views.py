@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.serializers import MeSerializer
 from apps.audit.services import record_audit
+from apps.core.client_ip import client_ip
 from apps.core.exceptions import ApiException
 from apps.core.throttling import ScopedSimpleRateThrottle
 
@@ -22,20 +23,6 @@ class LoginThrottle(ScopedSimpleRateThrottle):
     """Rate limit on login attempts (NFR-007)."""
 
     scope = "login"
-
-    def get_cache_key(self, request, view):
-        if request.user and request.user.is_authenticated:
-            ident = request.user.pk
-        else:
-            ident = self.get_ident(request)
-        return self.cache_format % {"scope": self.scope, "ident": ident}
-
-
-def _client_ip(request) -> str | None:
-    forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR")
 
 
 class CsrfTokenView(APIView):
@@ -80,7 +67,7 @@ class LoginView(APIView):
                 after={"username": username},
                 outcome="failure",
                 correlation_id=getattr(request, "correlation_id", None),
-                ip_address=_client_ip(request),
+                ip_address=client_ip(request),
             )
             # Generic message: do not reveal whether the account exists (FR-001).
             raise ApiException(401, "AUTHENTICATION_FAILED", GENERIC_LOGIN_FAILURE)
@@ -91,7 +78,7 @@ class LoginView(APIView):
             target=user,
             outcome="success",
             correlation_id=getattr(request, "correlation_id", None),
-            ip_address=_client_ip(request),
+            ip_address=client_ip(request),
         )
         return Response({"user": MeSerializer(user).data})
 
@@ -106,7 +93,7 @@ class LogoutView(APIView):
             target=request.user,
             outcome="success",
             correlation_id=getattr(request, "correlation_id", None),
-            ip_address=_client_ip(request),
+            ip_address=client_ip(request),
         )
         logout(request)
         return Response(status=204)

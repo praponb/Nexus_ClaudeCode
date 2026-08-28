@@ -31,7 +31,21 @@ PASSWORD_HASHERS = [
 # tests patch the throttle classes directly to verify throttling behaviour.
 REST_FRAMEWORK = {
     **REST_FRAMEWORK,
-    "DEFAULT_THROTTLE_RATES": {"login": "1000/minute", "import_export": "1000/hour"},
+    "DEFAULT_THROTTLE_RATES": {
+        "login": "1000/minute",
+        "import_export": "1000/hour",
+        "search": "1000/minute",
+    },
+}
+
+# Keep the suite hermetic: base.py points the default cache at Redis (throttle
+# counters), but tests must not require a running Redis. In-process memory is
+# also per-test-run isolated, which the throttle tests rely on via cache.clear().
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "asset-inventory-test",
+    },
 }
 
 CELERY_TASK_ALWAYS_EAGER = True

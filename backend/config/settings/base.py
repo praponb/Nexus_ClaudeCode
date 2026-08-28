@@ -216,11 +216,22 @@ REST_FRAMEWORK = {
     # returning an unfiltered list rather than an error.
     "SEARCH_PARAM": "q",
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    # Production-safe defaults. local.py and test.py deliberately raise these
+    # ceilings for developer convenience -- do NOT copy those dev values back
+    # here: a permissive rate in base.py silently disables brute-force
+    # protection in production while making the overrides look like no-ops.
     "DEFAULT_THROTTLE_RATES": {
-        "login": "1000/minute",
-        "import_export": "1000/hour",
+        "login": "10/minute",
+        "import_export": "60/hour",
+        "search": "120/minute",
     },
 }
+
+# META key of a client-IP header the edge OVERWRITES on every request, used to
+# identify callers for throttling and audit. Empty means "trust nothing but
+# REMOTE_ADDR". Behind Cloudflare this is HTTP_CF_CONNECTING_IP; never point it
+# at HTTP_X_FORWARDED_FOR, which is caller-supplied. See apps/core/client_ip.py.
+TRUSTED_CLIENT_IP_HEADER = env("TRUSTED_CLIENT_IP_HEADER", "") or ""
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Asset Inventory API",
@@ -245,7 +256,23 @@ LOGGING = {
     "root": {"handlers": ["console"], "level": LOG_LEVEL},
 }
 
+# Cache. DRF's throttles store their counters in the *default* cache, so this
+# is what makes rate limiting real (design section 12: "Rate limiting
+# (Redis-backed)"). Django's implicit default is LocMemCache, which is
+# per-process and lost on restart -- under the production image's
+# `gunicorn --workers 3` that silently triples every configured rate and
+# resets it on each deploy. Redis db 3: 1 and 2 are the Celery broker/results.
+CACHE_URL = env("CACHE_URL") or "redis://localhost:6379/3"
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": CACHE_URL,
+    },
+}
+
 # Celery (Cycle 2+ background jobs: import/export commit, notifications).
 CELERY_BROKER_URL = env("CELERY_BROKER_URL") or env("REDIS_URL") or "redis://localhost:6379/1"
-CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND") or env("REDIS_URL") or "redis://localhost:6379/2"
+CELERY_RESULT_BACKEND = (
+    env("CELERY_RESULT_BACKEND") or env("REDIS_URL") or "redis://localhost:6379/2"
+)
 CELERY_TASK_ALWAYS_EAGER = env_bool("CELERY_TASK_ALWAYS_EAGER", APP_ENV == "local")
