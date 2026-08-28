@@ -28,6 +28,27 @@ All four quality gates (`ruff check`, `ruff format --check`, `mypy src`,
 `pytest`) must pass before considering a change done. The test suite runs
 entirely offline against the `FakeLlm` double -- no credentials needed.
 
+## The generated app is live and public
+
+`backend/` + `frontend/` are not just build output any more: they are deployed
+at <https://inventory.praponb.com>, reachable by anyone, with no Cloudflare
+Access in front. **Changes here reach the public internet.** The Django login is
+the only gate.
+
+- Full history, current accounts, and the operations runbook:
+  `SESSION-2026-08-28-SECURITY.md`.
+- Backend gates: `./scripts/check.sh` (six gates). It falls back to a one-off
+  dev-stage container automatically, because the deployed image is the
+  production target and carries no ruff/mypy/pytest.
+- Frontend gates: `cd frontend && npm run lint && npm run typecheck && npm run test`.
+- **Editing `compose.yaml` triggers an unattended `docker compose up -d` within
+  5 minutes** — a launchd watchdog polls on that interval. A half-finished edit
+  can take the site down. Check
+  `~/Library/Logs/inventory-stack-autostart.log` afterwards.
+- The real root `.env` is gitignored, so production configuration is not in git
+  and a regression there leaves no trace. Verify the *running* config
+  (`docker compose exec backend python -c "...settings.DEBUG"`), not the repo.
+
 ## Ownership boundaries (enforced in code, not just convention)
 
 | Owner | Path |
@@ -85,3 +106,22 @@ requirement; fail with `ConfigError`/`ModelResolutionError` instead. See
   traversal guard) and `events.atomic_write_text`/`atomic_write_json`.
 - Secrets are masked via `config.mask_secrets` everywhere text is logged,
   persisted to `events.jsonl`, or shown in CLI error output.
+
+Invariants for the deployed app (`backend/`) -- same rule, do not weaken
+without discussion:
+
+- Client identity for throttling and audit comes from
+  `apps/core/client_ip.py`, which trusts one configured header then
+  `REMOTE_ADDR`. **Never key on `X-Forwarded-For`** -- it is caller-supplied,
+  so rotating it buys a fresh throttle bucket per request, and it once reached
+  a Postgres `inet` column unvalidated (an unauthenticated 500).
+- Throttle counters must live in a *shared* cache. Django's default
+  `LocMemCache` is per-process: under `gunicorn --workers 3` it multiplies
+  every configured rate by three and resets on each deploy.
+- Dev throttle ceilings belong in `local.py`/`test.py` only. A permissive rate
+  in `base.py` silently disables protection in production *and* makes those
+  overrides look like no-ops -- which is exactly how it went unnoticed before.
+- `POST /auth/login/` must not establish a session for an MFA-required role
+  until the second factor is satisfied.
+- The public `demo` account stays exempt from per-account lockout; locking a
+  shared published account denies every visitor at once.

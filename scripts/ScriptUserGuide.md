@@ -36,10 +36,13 @@ checkout, before `dev-up.sh`.
 ```
 
 > **Note:** the templates in `scripts/templates/` are the plain local-dev
-> defaults (`DJANGO_SETTINGS_MODULE=config.settings.local`, `DJANGO_DEBUG=true`,
-> frontend build `target: dev`, no `POSTGRES_SSLMODE`). If you've since
+> defaults (`DJANGO_SETTINGS_MODULE=config.settings.local`,
+> `BACKEND_BUILD_TARGET=dev`, `LOCAL_AUTH_ALLOW_IN_PRODUCTION=false`, an empty
+> `TRUSTED_CLIENT_IP_HEADER`). They are kept in sync with the canonical
+> `backend/compose.yaml` and `backend/.env`. If you've since
 > hardened your root `compose.yaml`/`.env` for a real deployment (production
-> Django settings, `target: production`, Cloudflare Access, etc.), **do not
+> Django settings, `BACKEND_BUILD_TARGET=production`, loopback-only port
+> bindings, `TRUSTED_CLIENT_IP_HEADER`, etc.), **do not
 > delete and re-run this script** — since it only acts when the root files
 > are missing, deleting them and re-running would silently regenerate the
 > insecure dev-mode versions. Treat the templates as a starting point for a

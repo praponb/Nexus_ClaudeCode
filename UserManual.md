@@ -28,9 +28,23 @@ signed in.
 
 ## 1. Signing in and the app shell
 
-Go to http://localhost:3000/login and sign in with a demo account (see
-[FAQ.md](FAQ.md#what-do-i-log-in-with) for the list). After signing in you
-land on the Dashboard.
+Go to `/login` and sign in (see [FAQ.md](FAQ.md#what-do-i-log-in-with) for the
+account list) — `http://localhost:3000/login` for a local stack, or
+<https://inventory.praponb.com/login> for the deployed one. After signing in
+you land on the Dashboard.
+
+**If your account requires two-factor authentication** (administrators do),
+sign-in is two steps. The password step alone does not sign you in:
+
+- **First time:** the app shows a QR code. Scan it with an authenticator app
+  (Google Authenticator, 1Password, Authy…), enter the 6-digit code, then
+  **save the 10 recovery codes it shows** — they are displayed only once, and
+  each works exactly once.
+- **Afterwards:** enter the current 6-digit code. If you don't have your
+  authenticator to hand, choose *Use a recovery code instead*.
+
+You have 5 minutes to complete the second step before the attempt expires and
+you have to start again.
 
 The app shell has:
 - **Top bar** — search, notification bell, help, account menu (sign out is
@@ -214,6 +228,7 @@ overwriting it.
 | Inventory Operator | Register/edit assets, run stocktakes; no finance/reports/admin access |
 | Employee | View and act on their own assigned assets only |
 | Auditor | Read-only everywhere, plus full audit log and reports access |
+| Viewer | Read-only across the whole register — no writes, no finance fields, no audit log. Used for the public demo account |
 
 Exact capabilities are always re-checked server-side — the UI hiding a
 button is a convenience, not the actual security boundary.
@@ -231,9 +246,9 @@ Everything below lives in `scripts/` at the repo root, and (except
 | `dev-down.sh` | Stops the stack (`docker compose down --remove-orphans`). Data volumes are preserved — add `-v` yourself to `docker compose down -v` if you actually want to wipe data. | End of a dev session, or to restart clean. |
 | `migrate.sh` | Runs `python manage.py migrate` inside the running backend container. Forwards any extra args. | After pulling changes that include new backend migrations. |
 | `seed-dev.sh` | Runs the `seed_dev` management command (creates demo users + ~200 sample assets). Idempotent — safe to re-run. | After a fresh `migrate`, or to reset demo data. |
-| `check.sh` | Runs all six backend quality gates in order: `ruff format --check`, `ruff check`, `mypy`, `makemigrations --check --dry-run`, `check --deploy`, `pytest`. Runs inside the container by default; set `CHECK_MODE=local` to run against a host-installed venv instead. | Before committing/pushing backend changes. |
+| `check.sh` | Runs all six backend quality gates in order: `ruff format --check`, `ruff check`, `mypy`, `makemigrations --check --dry-run`, `check --deploy`, `pytest`. Prefers the running backend container, but that only carries ruff/mypy/pytest when built from the `dev` stage — against a `BACKEND_BUILD_TARGET=production` stack it automatically falls back to a one-off dev-stage container. Set `CHECK_MODE=local` to run against a host-installed venv instead. | Before committing/pushing backend changes. |
 | `export-openapi.sh` | Regenerates `backend/openapi.json` from the live schema (via drf-spectacular) and validates it. | After changing any backend API (serializers/views/urls). |
-| `backup.sh` | Dumps the Postgres database with `pg_dump`, gzips it, and writes it to `backups/<timestamp>.sql.gz` (git-ignored). Reminds you to also snapshot the attachment media volume on the same schedule. | Before risky changes, or on a backup schedule. Interim target: daily (RPO ≤ 24h) — see `backend/docs/BACKUP_RESTORE.md`. |
+| `backup.sh` | Dumps the Postgres database with `pg_dump`, gzips it to `backups/<timestamp>.sql.gz` (git-ignored), then prunes to the newest `BACKUP_KEEP` dumps (default 48). Reminds you to also snapshot the attachment media volume on the same schedule. | Runs daily on its own via the `com.praponb.inventory.backup` LaunchAgent; run it by hand before risky changes. See `backend/docs/BACKUP_RESTORE.md`. |
 | `restore.sh <file.sql.gz>` | **Destructive.** Drops and recreates the database, then restores the given backup into it. Refuses to run if `APP_ENV=production`. Run `migrate.sh` afterward for any migrations created since that backup. | Disaster recovery, or restoring a known-good snapshot locally. |
 
 For the full backup/restore drill procedure (including the audit-chain

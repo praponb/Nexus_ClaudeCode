@@ -63,10 +63,31 @@ NUXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1 npm run dev
 Your Postgres role needs `CREATEDB` if you also want to run the backend
 test suite (`pytest` spins up a throwaway `test_*` database).
 
+## Is this deployed anywhere?
+
+Yes — <https://inventory.praponb.com>, publicly reachable by anyone since
+2026-08-28. It runs from Docker Compose on a Mac, exposed through a
+Cloudflare Tunnel. There is **no Cloudflare Access gate any more**: the
+Django login is the only thing in front of it.
+
+The public demo account is read-only:
+
+```
+demo / PublicDemo2026!
+```
+
+For the full account list, the security controls in front of that login, and
+the operational runbook, see
+[`SESSION-2026-08-28-SECURITY.md`](SESSION-2026-08-28-SECURITY.md).
+
 ## What do I log in with?
 
-`seed_dev` creates six demo users, all local-only (session-cookie auth, not
-for production):
+**On the deployed site**, only two accounts are active: `demo` (above) and the
+administrator account, which requires a TOTP code from an authenticator app in
+addition to its password. The other five seeded accounts are **deactivated** —
+they were unused and every live account is attack surface.
+
+**On a fresh local checkout**, `seed_dev` creates six demo users:
 
 | Username | Role | Notes |
 |---|---|---|
@@ -77,10 +98,36 @@ for production):
 | `employee` | Employee | can view/report on their own assigned assets |
 | `auditor` | Auditor | read-only + full audit log access |
 
+`seed_dev` does not create a `viewer` account; make one by hand if you want to
+exercise that role locally.
+
 Password: whatever you set `SEED_DEMO_PASSWORD` to before running
 `seed_dev`. If you didn't set it, `seed_dev` generates a random one and
 prints it once to the console — check your terminal output, it isn't
-stored anywhere retrievable afterward.
+stored anywhere retrievable afterward. Note that `seed_dev` only sets a
+password when it *creates* a user, so re-running it will not reset an
+existing account's password.
+
+## What stops someone brute-forcing the login?
+
+Three things, since the site is public and the login is the only gate:
+
+- **Per-IP rate limit** — 10 login attempts per minute per client IP.
+- **Per-account lockout** — failed attempts are counted per *username* and
+  refused past a threshold (default 10 per 15 minutes), so spreading an attack
+  across many IPs doesn't help. Failures only; a successful sign-in clears the
+  counter. The public `demo` account is exempt, because its password is
+  published and locking it would deny every visitor at once.
+- **Two-factor authentication** — accounts with the `system_admin` role must
+  present a TOTP code, so a stolen admin password alone is not enough.
+
+If you lock yourself out, it clears on its own after the window, or
+immediately with:
+
+```bash
+docker compose exec backend python -c "import django; django.setup(); \
+  from apps.core.login_guard import reset; reset('<username>')"
+```
 
 ## What can I actually do in the app?
 
@@ -159,8 +206,9 @@ Honestly, per the latest run's [final report](runs/):
 
 - **Browser/E2E test coverage** (accessibility scans, full cross-browser
   matrix, camera-scanning E2E) is authored but was environment-blocked
-  during automated QA — it was never actually executed in a real browser
-  by the agents. (This is exactly the category of gap that surfaced the
+  during automated QA. The sign-in paths — including the two-step 2FA
+  enrolment and verification flow — have since been driven end to end in a
+  real browser, but the rest of the suite still has not been executed. (This is exactly the category of gap that surfaced the
   real bugs fixed during manual testing — see git history / conversation
   log for specifics: dashboard activity rendering, notification
   preferences, missing form fields, CORS headers.)
@@ -168,8 +216,6 @@ Honestly, per the latest run's [final report](runs/):
   work; SMTP dispatch is backlog).
 - One **High-severity npm audit finding** (transitive dev dependency) is
   open with a recorded, conditional risk acceptance — not yet patched.
-- `backend/uv.lock` isn't committed yet (accepted risk; `package-lock.json`
-  for the frontend is committed and pinned).
 - Full-scale (~100k record) performance verification wasn't run in this
   environment; query-count discipline was verified at seeded volume only.
 
