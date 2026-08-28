@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
-# Run all backend quality gates. Default: inside the compose backend container.
-# Set CHECK_MODE=local to run on the host instead (requires pip install -e '.[dev]').
+# Run all backend quality gates.
+#
+# CHECK_MODE=compose (default) runs them in Docker. It prefers `exec` into the
+# running backend container, but that container only carries ruff/mypy/pytest
+# when it was built from the `dev` stage -- deploy with
+# BACKEND_BUILD_TARGET=production and it is a gunicorn image with no dev tools.
+# So it falls back to a one-off container built from the dev stage, joined to
+# the running stack's network. CHECK_MODE=local runs on the host instead
+# (requires pip install -e '.[dev]' under backend/).
 set -euo pipefail
 
 echo "==> Target environment: CI/LOCAL quality gates (backend)"
@@ -17,12 +24,61 @@ if [ ! -f compose.yaml ] && [ -f backend/compose.yaml ]; then
 fi
 
 MODE="${CHECK_MODE:-compose}"
+DEV_IMAGE="${CHECK_DEV_IMAGE:-asset-inventory-backend-dev}"
+RUNNER=""   # set below for compose mode; unused (but must be defined) under set -u
+
+# POSTGRES_* for the one-off container; .env is the same source compose reads.
+if [ -f .env ]; then
+  while IFS='=' read -r key value; do
+    case "$key" in POSTGRES_DB|POSTGRES_USER|POSTGRES_PASSWORD) export "$key=$value" ;; esac
+  done < <(grep -E '^POSTGRES_(DB|USER|PASSWORD)=' .env || true)
+fi
+
+backend_has_dev_tools() {
+  docker compose exec -T backend sh -c 'command -v ruff >/dev/null 2>&1' 2>/dev/null
+}
+
+one_off_run() {
+  if ! docker image inspect "$DEV_IMAGE" >/dev/null 2>&1; then
+    echo "==> Building $DEV_IMAGE (dev stage) for the quality gates ..."
+    docker build --target dev -t "$DEV_IMAGE" ./backend >/dev/null
+  fi
+  local pg network
+  pg="$(docker compose ps -q postgres)"
+  if [ -z "$pg" ]; then
+    echo "ERROR: postgres is not running; pytest needs it. Run ./scripts/dev-up.sh first." >&2
+    exit 1
+  fi
+  network="$(docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{end}}' "$pg")"
+  # Mounted at /w, not /app: the image keeps its virtualenv at /app/.venv, and
+  # mounting over /app would hide the very tools we came here to run.
+  docker run --rm --network "$network" \
+    -v "$PWD/backend:/w" -w /w \
+    -e DJANGO_SETTINGS_MODULE=config.settings.test \
+    -e POSTGRES_HOST=postgres -e POSTGRES_PORT=5432 \
+    -e "POSTGRES_DB=${POSTGRES_DB:-asset_inventory}" \
+    -e "POSTGRES_USER=${POSTGRES_USER:-asset_inventory}" \
+    -e "POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-local-dev-password}" \
+    -e POSTGRES_SSLMODE=disable \
+    "$DEV_IMAGE" "$@"
+}
+
+if [ "$MODE" = "compose" ]; then
+  if backend_has_dev_tools; then
+    RUNNER=exec
+  else
+    RUNNER=one-off
+    echo "==> Running backend container has no dev tools; using a one-off dev-stage container."
+  fi
+fi
 
 run() {
   if [ "$MODE" = "local" ]; then
     (cd backend && "$@")
-  else
+  elif [ "$RUNNER" = "exec" ]; then
     docker compose exec -T -e DJANGO_SETTINGS_MODULE=config.settings.test backend "$@"
+  else
+    one_off_run "$@"
   fi
 }
 

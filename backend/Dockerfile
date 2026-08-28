@@ -21,7 +21,10 @@ RUN uv sync --frozen --no-dev && chown -R appuser:appuser /app
 EXPOSE 8000
 
 FROM base AS dev
-RUN uv sync --frozen
+# `dev` is a [project.optional-dependencies] extra, so a bare `uv sync` skips
+# it -- the dev image shipped without ruff/mypy/pytest and scripts/check.sh
+# could not run in its default (compose) mode.
+RUN uv sync --frozen --extra dev
 USER appuser
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
 
