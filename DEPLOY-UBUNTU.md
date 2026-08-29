@@ -650,6 +650,10 @@ not run it before deciding whether the underlying recording bug matters.
 
 ### Still outstanding
 
+A consolidated, verified list lives in
+[`SESSION-2026-08-29-ISSUES.md`](SESSION-2026-08-29-ISSUES.md) — prefer it over
+this section, which is scoped to the migration.
+
 - **cloudflared updates are manual** on this host — see section 6. Re-check
   whether Cloudflare has published a `resolute` suite; once they do, switch to
   the apt-managed path and this item retires.

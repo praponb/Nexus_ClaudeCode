@@ -291,6 +291,12 @@ Details and suggested fixes: [`DEPLOY-UBUNTU.md`](DEPLOY-UBUNTU.md) section 8.
 Apart from those two, none of these block normal use of the app in a dev/demo
 environment.
 
+## What's currently broken or outstanding?
+
+`SESSION-2026-08-29-ISSUES.md` is the consolidated, verified list — including
+two open defects that affect users directly (attachments cannot be uploaded, and
+the audit chain does not verify).
+
 ## Where do I report a real problem?
 
 Every API error response includes a `correlation_id` (shown in the UI as

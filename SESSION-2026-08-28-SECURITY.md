@@ -11,6 +11,10 @@ The session started with "I lost my admin password" and ended with
 `inventory.praponb.com` publicly reachable and hardened. The password turned out
 not to be lost; looking for it surfaced everything else.
 
+**Superseded:** for anything still needing action, read
+`SESSION-2026-08-29-ISSUES.md` instead — the outstanding list below has since
+been partly completed (2FA enrolment is done) and is kept only as history.
+
 **Start here:** [Outstanding actions](#outstanding-actions) — 2FA enrolment is
 unfinished, which currently blocks admin sign-in.
 

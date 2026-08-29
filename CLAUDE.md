@@ -41,6 +41,7 @@ Cloudflare Tunnel as before, now as a systemd `cloudflared` service. The MacBook
 standby** — containers stopped, volumes intact, both LaunchAgents unloaded. Full
 procedure and rollback: `DEPLOY-UBUNTU.md`.
 
+- **Open issues and anything needing action: `SESSION-2026-08-29-ISSUES.md`.**
 - Full history, current accounts, and the operations runbook:
   `SESSION-2026-08-28-SECURITY.md`.
 - **Code reaches production via `scripts/sync-to-server.sh` (rsync), not git.**
