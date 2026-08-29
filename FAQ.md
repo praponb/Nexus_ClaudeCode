@@ -267,37 +267,37 @@ Honestly, per the latest run's [final report](runs/):
   preferences, missing form fields, CORS headers.)
 - **Email notification delivery** is not implemented (in-app notifications
   work; SMTP dispatch is backlog).
-- One **High-severity npm audit finding** (transitive dev dependency) is
-  open with a recorded, conditional risk acceptance — not yet patched.
 - Full-scale (~100k record) performance verification wasn't run in this
   environment; query-count discipline was verified at seeded volume only.
 
 Two further defects were found on 2026-08-29 while migrating the app to its own
-server. Both are **pre-existing and still open**, and neither was caused by the
-move — they reproduce identically on the old host:
+server. Both were **pre-existing**, neither was caused by the move, and both
+were resolved on 2026-08-30:
 
-- **Attaching a file to an asset fails.** The media volume is owned by `root`
-  while the application container runs as an unprivileged user, so writing an
-  attachment raises `PermissionError`. This is why no attachment has ever been
-  stored. Anyone who has tried to attach a file will have seen an error.
+- **Attaching a file to an asset failed.** `/app/media` did not exist in the
+  image, so Docker created the volume mount point as `root` while the app runs
+  as an unprivileged user, and every upload raised `PermissionError`. That is
+  why no attachment had ever been stored. **Fixed and deployed** — verified in
+  production by writing and removing a real file.
 - **The audit log's tamper-evident chain does not verify.** `verify_chain()`
-  returns `False`: seven `auth.*` events (sign-in, sign-out, 2FA enrolment and
-  verification) carry a hash that does not recompute from their stored content.
-  The chain *links* between records are all intact, so this is not a truncated
-  or spliced log — it is seven individual records disagreeing with their own
-  hash. `reseal_chain()` would make the check pass but would overwrite the
-  evidence needed to explain it, so it has deliberately not been run.
+  still returns `False`, and that is now known to be harmless. Seven `auth.*`
+  events belonged to a user account that was later deleted; the actor link is
+  `SET_NULL` and the record hash covers the actor's UUID, so removing the user
+  invalidated their rows while every link between records stayed intact. It is
+  bookkeeping, not tampering. `python manage.py audit_chain_report` shows which
+  rows and why, read-only. `reseal_chain()` would make the check pass but would
+  overwrite the evidence, so it has deliberately not been run.
 
-Details and suggested fixes: [`DEPLOY-UBUNTU.md`](DEPLOY-UBUNTU.md) section 8.
+Details: [`SESSION-2026-08-29-ISSUES.md`](SESSION-2026-08-29-ISSUES.md) §2.
 
-Apart from those two, none of these block normal use of the app in a dev/demo
-environment.
+None of these block normal use of the app in a dev/demo environment.
 
 ## What's currently broken or outstanding?
 
-`SESSION-2026-08-29-ISSUES.md` is the consolidated, verified list — including
-two open defects that affect users directly (attachments cannot be uploaded, and
-the audit chain does not verify).
+`SESSION-2026-08-29-ISSUES.md` is the consolidated, verified list. Its §0 is the
+short answer: what remains is Cloudflare edge protection (dashboard work), a
+credentials file to move into a password manager, two unmanaged package installs
+on the server, and an untested reboot. No open defect affects users.
 
 ## Where do I report a real problem?
 

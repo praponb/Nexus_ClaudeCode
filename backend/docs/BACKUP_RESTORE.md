@@ -104,11 +104,15 @@ and `KeepAlive` must stay absent (this is a periodic task, not a daemon — with
 
      > **This currently prints `False`, and that is not a restore failure.**
      > Seven pre-existing `auth.*` events (ids 403-409) carry a hash that does
-     > not recompute; the chain *links* are all intact. Compare the result
-     > against the source system instead of expecting `True` — if the source
-     > says `False` and the restore says `False`, the restore is faithful. See
-     > `SESSION-2026-08-29-ISSUES.md` §2.2. Do not run `reseal_chain()` to make
-     > this green: it would overwrite the evidence needed to diagnose it.
+     > not recompute, because their actor was deleted: `AuditEvent.actor` is
+     > `on_delete=SET_NULL` and the payload hashes `actor.uuid`, so removing a
+     > user invalidates that user's rows while every `prev_hash` link stays
+     > intact. Compare the result against the source system instead of expecting
+     > `True` — if the source says `False` and the restore says `False`, the
+     > restore is faithful. `python manage.py audit_chain_report` (read-only)
+     > prints which rows and why. Do not run `reseal_chain()` to make this
+     > green: it would overwrite the evidence. See
+     > `SESSION-2026-08-29-ISSUES.md` §2.2.
 7. Record drill date, dataset size, and elapsed time (target ≤ 8h RTO).
 
 ## Rollback after a failed deploy
@@ -121,8 +125,9 @@ stated in the release notes.
 
 - The audit log is hash-chained; `verify_chain()` after restore is the
   tamper-evidence check (FR-025). It is currently `False` for a known,
-  pre-existing reason — see the drill note above before treating that as a
-  restore problem.
+  pre-existing reason — a deleted actor, not tampering — see the drill note
+  above before treating that as a restore problem. `audit_chain_report` is the
+  command that tells the two apart.
 - Retention of archived records is configured via `ARCHIVE_RETENTION_DAYS`
   (default ~7 years). No operational function physically deletes business
   records (FR-030); assets under `legal_hold` must never be purged by any

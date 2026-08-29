@@ -70,19 +70,19 @@
     "test_id": "TC-D08-04"
   },
   "TC-DEF-001-01": {
-    "actual_result": "Root compose.yaml absent. backend/compose.yaml exists and is complete (postgres:18-alpine, redis:7, backend, celery-worker, celery-beat, frontend, healthchecks, non-default-env placeholders) but documented root bootstrap requires a manual copy step; Docker unavailable here so boot unverified.",
-    "cycle_last_executed": 2,
+    "actual_result": "Re-executed 2026-08-30. Root compose.yaml is present and is the file the deployed stack is built from (six services, healthchecks, 127.0.0.1-bound ports). The bootstrap copy step the original run flagged is now performed automatically by check.sh/backup.sh/dev-up.sh when the root file is absent. Boot verified for real: the same compose file runs production on the Ubuntu host with all six containers up.",
+    "cycle_last_executed": 3,
     "defect_id": "DEF-101",
-    "evidence_path": "inspection: workspace root + backend/compose.yaml",
-    "status": "FAILED",
+    "evidence_path": "inspection: repo-root compose.yaml; docker compose ps on prapon@192.168.1.49",
+    "status": "PASSED",
     "test_id": "TC-DEF-001-01"
   },
   "TC-DEF-002-01": {
-    "actual_result": "Root .env.example absent. backend/.env.example verified complete + placeholder-only; .gitignore ignores .env/.env.* with !.env.example exception. Placement requirement (repo root, design \u00a716.1) unmet.",
-    "cycle_last_executed": 2,
+    "actual_result": "Re-executed 2026-08-30. The criterion is genuinely unmet and is not going to be met: root .env.example is absent, and backend/.env.example has since been removed too. Env templates now live in scripts/templates/.env, installed by scripts/install-root-files.sh, which is why the root example was dropped. Recorded as an accepted deviation rather than flipped to PASSED -- the test asserts a placement the project deliberately abandoned, so the honest result is a waiver with a rationale, not a green tick.",
+    "cycle_last_executed": 3,
     "defect_id": "DEF-102",
-    "evidence_path": "inspection: workspace root + backend/.env.example + .gitignore",
-    "status": "FAILED",
+    "evidence_path": "inspection: repo root, backend/, scripts/templates/.env, scripts/install-root-files.sh",
+    "status": "WAIVED",
     "test_id": "TC-DEF-002-01"
   },
   "TC-DEF-003-01": {
@@ -108,11 +108,11 @@
     "test_id": "TC-DEF-005-01"
   },
   "TC-DEF-005-02": {
-    "actual_result": "No disposition found: frontend README deviations and backend README contain no mention of the Cycle-1 npm-audit critical; npm audit remains non-allowlisted so fix cannot be verified. Per test criteria, absence of both fix and written rationale is a failure.",
+    "actual_result": "Re-executed 2026-08-30. The defect this case tracked is gone rather than dispositioned: `npm audit` reports 0 vulnerabilities with and without dev dependencies, so there is no longer a Cycle-1 npm-audit finding to fix or write a rationale for.",
     "cycle_last_executed": 3,
     "defect_id": "DEF-104",
-    "evidence_path": "inspection: frontend/README.md, backend/README.md, allowlist probe",
-    "status": "FAILED",
+    "evidence_path": "tool-output: npm audit --omit=dev (0 vulnerabilities); npm audit (0 vulnerabilities)",
+    "status": "PASSED",
     "test_id": "TC-DEF-005-02"
   },
   "TC-DEF-006-01": {
@@ -1768,11 +1768,11 @@
     "test_id": "TC-NFR-012-01"
   },
   "TC-REL-001": {
-    "actual_result": "Gates all green (backend 155 + ruff + mypy; frontend 88 + lint + typecheck + build), OpenAPI drift guard passing with C3 endpoints, docs current \u2014 but the defect register contains one undispositioned High (DEF-104/DEF-005), violating \u00a717 'no unresolved critical/high without recorded risk decision'.",
+    "actual_result": "Re-executed 2026-08-30. All gates green: backend 182 passed plus ruff format/check, mypy, makemigrations --check, check --deploy; frontend lint, typecheck and 101 unit tests; orchestrator ruff, mypy and 72 tests. The blocking condition -- an undispositioned High (DEF-104) -- is resolved: npm audit is clean. The other High found since (attachment uploads failing with PermissionError) was fixed and deployed the same day. Remaining open items are Medium/Low and are recorded with owners in SESSION-2026-08-29-ISSUES.md.",
     "cycle_last_executed": 3,
     "defect_id": "DEF-104",
-    "evidence_path": "tool-output: all gates; inspection: READMEs, defects register",
-    "status": "FAILED",
+    "evidence_path": "tool-output: scripts/check.sh, npm run lint/typecheck/test, pytest; SESSION-2026-08-29-ISSUES.md",
+    "status": "PASSED",
     "test_id": "TC-REL-001"
   },
   "TC-STK-001": {
@@ -1804,11 +1804,11 @@
     "test_id": "TC-STK-004"
   },
   "TC-STK-005": {
-    "actual_result": "Hygiene mostly verified (.env ignored, package-lock committed, placeholder-only env example, canonical bootstrap files present, no secrets in inspected files) but the security half of the register is incomplete: DEF-005 has no disposition (DEF-104) and uv.lock remains absent (ADR-003 documented).",
+    "actual_result": "Re-executed 2026-08-30. Both blocking gaps are closed: backend/uv.lock is present and is what the Docker build installs from (`uv sync --frozen`), and DEF-005/DEF-104 no longer exists because npm audit reports 0 vulnerabilities. Hygiene otherwise re-verified: .env and DEPLOYED_COMMIT gitignored, package-lock.json committed, no secrets in inspected files.",
     "cycle_last_executed": 3,
     "defect_id": "DEF-104",
-    "evidence_path": "inspection: .gitignore, lockfiles, READMEs",
-    "status": "FAILED",
+    "evidence_path": "inspection: .gitignore, backend/uv.lock, frontend/package-lock.json; tool-output: npm audit",
+    "status": "PASSED",
     "test_id": "TC-STK-005"
   },
   "TC-STK-006": {
