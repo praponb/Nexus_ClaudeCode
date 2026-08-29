@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copy the server's backups to a second machine (NFR-012, SESSION-2026-08-29-ISSUES 3.1).
+# Copy the server's backups to a second machine (NFR-012).
 # Run ON THE MAC. Companion to scripts/backup.sh, which runs on the server.
 #
 # Usage:

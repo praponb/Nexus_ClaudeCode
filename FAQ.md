@@ -294,10 +294,13 @@ None of these block normal use of the app in a dev/demo environment.
 
 ## What's currently broken or outstanding?
 
-`SESSION-2026-08-29-ISSUES.md` is the consolidated, verified list. Its §0 is the
-short answer: what remains is Cloudflare edge protection (dashboard work), a
-credentials file to move into a password manager, two unmanaged package installs
-on the server, and an untested reboot. No open defect affects users.
+`SESSION-2026-08-29-ISSUES.md` is the consolidated, verified list, trimmed to
+what is genuinely still open. Its §0 is the short answer: Cloudflare edge
+protection (dashboard work), a credentials file to move into a password manager,
+two unmanaged package installs on the server, an untested reboot, the audit
+chain's unapplied design fix, and — found while clearing this Mac — a *different*
+project whose database backups have been failing. No open item breaks the app
+for users.
 
 ## Where do I report a real problem?
 
