@@ -112,6 +112,20 @@ the evidence needed to explain it.
 
 ---
 
+## 3b. Housekeeping on the standby Mac
+
+None of these affect production. They are recorded because they are invisible
+otherwise and each is a small trap for a future session.
+
+| # | Item | Note |
+|---|---|---|
+| 3b.1 | **`com.praponb.jobs4dent.backup` is failing** — last exit status **1**, verified today. | A *different* project's production database backup. Left running deliberately during the tunnel cleanup, but it has not been succeeding. Worth a look if that project matters. |
+| 3b.2 | Two plists named `disabled-com.praponb.twin.*.plist` remain in `~/Library/LaunchAgents/`. | The prefix is misleading — it never disabled anything; launchd keys off the `Label` inside. They *are* now genuinely disabled via `launchctl disable`. Renaming them back would make the directory honest. |
+| 3b.3 | Stale `~/.cloudflared/jobs4dent-config.yml` and `twin-chatbot-config.yml`. | Neither drives anything: `chatbot.praponb.com` is served from the Ubuntu server's own containers, and the jobs4dent tunnel is disabled. Clutter that previously caused a wrong conclusion. |
+| 3b.4 | Mac `cloudflared` is **2026.7.3**; the server runs **2026.8.2**. | Only matters if the Mac is ever brought back for a rollback. |
+| 3b.5 | `com.praponb.preventsleep` (a `caffeinate` LaunchAgent) is still running. | It existed to stop the Mac sleeping and dropping the tunnel. That reason is gone; keep it only if something else needs the Mac awake. |
+| 3b.6 | `~/cf-staging/install-tunnel.sh` remains on the server. | Harmless — the credentials it staged were shredded once systemd had its own copy at mode 600. Delete when convenient. |
+
 ## 4. Known gaps accepted by choice
 
 Recorded so they are not rediscovered as surprises.
@@ -148,6 +162,11 @@ conflict with this list.
 | "62 unexecuted Playwright test cases" | memory / QA notes | **Executed.** 60 passed, 2 blocked, 15 evidence screenshots. |
 | "The backup timer is not installed" | `DEPLOY-UBUNTU.md` §8 | **Installed.** Timer enabled, next run 03:19; last run exited 0 and produced a valid dump + media tarball. |
 | "Production runs on a Mac" | several docs | **Ubuntu server since 2026-08-29.** |
+
+| "Attachments backed up by volume snapshot / bucket versioning" | `backend/docs/BACKUP_RESTORE.md` | **Corrected.** `backup.sh` now produces a media tarball directly, with a matching timestamp. |
+| Restore drill: "`verify_chain()` … must print `True`" | `backend/docs/BACKUP_RESTORE.md` | **Corrected — this one was dangerous.** It prints `False` for the known reason in §2.2, so a faithful restore would have looked like a failure and a good backup might have been discarded. |
+| Backup schedule documented as a macOS LaunchAgent | `backend/docs/BACKUP_RESTORE.md` | **Corrected.** Production is a systemd timer; the macOS section is now marked development/standby only. |
+| `testcase/` structure listing 3 files | `testcase/README.md` | **Corrected.** There are 12 entries including cycle-2/3 plans, `execution-status.json`, and `evidence/`. |
 
 The two blocked help-UI cases are genuine, though minor: `TC-HELP-05`
 (automated accessibility scan) and `TC-HELP-77` (forbidden-register response
