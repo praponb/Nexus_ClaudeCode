@@ -8,10 +8,29 @@ test cases derived from `requirements/*` and `detail-design-specification.md`.
 ```
 testcase/
 ├── README.md                     (this file)
-├── test-plan-cycle-1.md          Cycle 1 test plan: scope, traceability, environments, entry/exit criteria
-└── cycle-1/
-    └── test-cases.json           Master machine-readable test-case list for Cycle 1
+├── test-plan.md                  Master cross-cycle test plan
+├── test-plan-cycle-1.md          Cycle 1 plan: scope, traceability, environments, entry/exit criteria
+├── test-plan-cycle-2.md          Cycle 2 plan
+├── test-plan-cycle-3.md          Cycle 3 plan
+├── execution-status.json         Per-test-case status across all cycles (259 cases)
+├── cycle-1-test-cases.json       Cycle 1 machine-readable case list
+├── cycle-1-test-plan.md
+├── cycle-1/                      Cycle 1 working files
+├── test-cases/                   Suite-level case lists (e.g. help-guided-ui.json)
+├── help-ui-mcp-run-guide.md      How to drive the Help-page suite via the Playwright MCP
+└── evidence/                     Screenshots and artefacts captured during execution
 ```
+
+**Execution status as of 2026-08-29** (`execution-status.json`): 259 cases —
+183 passed, 69 blocked, 5 failed, 2 manual. Most blocks are "browser
+unavailable" carried from the original automated runs. The Help-page suite has
+since been executed against a real browser: 60 of 62 passed, with
+`TC-HELP-05` (accessibility scan) and `TC-HELP-77` (forbidden-register alert)
+still blocked.
+
+> Some recorded failures are themselves stale — e.g. `TC-DEF-001-01` asserts the
+> root `compose.yaml` is absent (it exists) and `TC-DEF-002-01` expects a
+> `.env.example` that was removed deliberately. Re-run before acting on them.
 
 ## Conventions
 
