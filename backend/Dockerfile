@@ -16,7 +16,12 @@ COPY manage.py ./
 COPY config ./config
 COPY apps ./apps
 
-RUN uv sync --frozen --no-dev && chown -R appuser:appuser /app
+# /app/media must exist IN THE IMAGE, not just as a compose mount point. Docker
+# copies the image path's ownership into a new empty named volume; with no such
+# path it creates the mount point itself, root-owned, and the container -- which
+# runs as appuser -- cannot write there. That is why every attachment upload
+# failed with PermissionError and the media volume was always empty.
+RUN uv sync --frozen --no-dev && mkdir -p /app/media && chown -R appuser:appuser /app
 
 EXPOSE 8000
 

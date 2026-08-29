@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Pull the server's backups to this Mac (SESSION-2026-08-29-ISSUES 3.1).
+
+  This is the OFFSITE half of the backup story. scripts/backup.sh runs on the
+  Ubuntu server and writes to the same disk it just dumped; this job copies those
+  dumps to a second machine, which is the part that makes them survive a drive
+  failure.
+
+  NOT INSTALLED BY DEFAULT, and deliberately so. This Mac is a cold standby: its
+  whole point is that nothing here starts on its own. Bootstrapping a LaunchAgent
+  is a decision to make on purpose, not a side effect of a code change -- the
+  migration's hardest-won lesson was that launchd jobs come back unannounced.
+
+  Install (no sudo -- this is a LaunchAgent, not a LaunchDaemon):
+
+    cp scripts/com.praponb.inventory.pull-backups.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) \
+      ~/Library/LaunchAgents/com.praponb.inventory.pull-backups.plist
+
+  Uninstall:
+
+    launchctl bootout gui/$(id -u)/com.praponb.inventory.pull-backups
+    launchctl disable gui/$(id -u)/com.praponb.inventory.pull-backups
+
+  It needs working key-based ssh to the server as the logged-in user; launchd
+  jobs cannot answer a passphrase prompt, so an ssh key with a passphrase that
+  is not in the agent will make every run hang or fail.
+
+  RunAtLoad takes one immediately at login, so a Mac that was asleep through its
+  slot is not left a full day behind.
+
+  KeepAlive is deliberately absent: this is a periodic task, not a daemon. With
+  KeepAlive launchd would restart it the moment it exits and pull in a loop.
+
+  PATH must be set explicitly. launchd gives a job a minimal PATH that does not
+  include /opt/homebrew/bin, so the newer rsync is not found.
+
+  BACKUP_MIRROR_DIR puts a second copy in iCloud Drive. It is a mirror, not the
+  primary: iCloud here runs with "Optimize Mac Storage", so macOS may evict the
+  local copy and leave a placeholder. Recovery must not depend on a download.
+  Uncomment it only if that trade-off is acceptable.
+-->
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.praponb.inventory.pull-backups</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>/Users/praponb/GitHub/Nexus_ClaudeCode/scripts/pull-backups.sh</string>
+	</array>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+		<key>BACKUP_PULL_DIR</key>
+		<string>/Users/praponb/inventory-backups</string>
+		<key>BACKUP_PULL_KEEP</key>
+		<string>30</string>
+		<!--
+		<key>BACKUP_MIRROR_DIR</key>
+		<string>/Users/praponb/Library/Mobile Documents/com~apple~CloudDocs/Inventory-Backups</string>
+		-->
+	</dict>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>StartInterval</key>
+	<integer>86400</integer>
+	<key>StandardOutPath</key>
+	<string>/Users/praponb/Library/Logs/com.praponb.inventory.pull-backups.log</string>
+	<key>StandardErrorPath</key>
+	<string>/Users/praponb/Library/Logs/com.praponb.inventory.pull-backups.log</string>
+</dict>
+</plist>

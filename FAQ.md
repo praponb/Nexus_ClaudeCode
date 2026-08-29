@@ -101,10 +101,12 @@ docker compose build && docker compose up -d
 ./scripts/migrate.sh
 ```
 
-> **Your working tree is the only record of what is deployed.** Because the
-> server has no git history, an uncommitted change that gets synced is
-> untraceable afterwards. `sync-to-server.sh` warns when the tree is dirty —
-> don't ignore it on a real deploy.
+> **Commit before you sync.** Because the server has no git history, an
+> uncommitted change that gets synced is untraceable afterwards.
+> `sync-to-server.sh` refuses to run on a dirty tree for that reason; pass
+> `--allow-dirty` only when you are knowingly iterating against the server.
+> Each sync also writes `~/inventory/DEPLOYED_COMMIT` on the server, recording
+> the SHA, branch and dirty flag it was deployed from.
 
 `node_modules` and `.venv` are deliberately excluded from the sync: they hold
 compiled binaries for the developer machine's architecture, and the Docker build

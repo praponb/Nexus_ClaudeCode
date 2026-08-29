@@ -153,3 +153,25 @@ def test_label_returns_qr_svg_and_deep_link(api_client, make_user, make_asset, r
     assert body["url"].endswith("/scan?tag=ATT-007")
     assert "svg" in body["svg"].lower()
     assert body["label"] == {"width_mm": 50, "height_mm": 25}
+
+
+def test_dockerfile_creates_media_dir_owned_by_appuser():
+    """The upload tests above run against a tmp_path MEDIA_ROOT, which is exactly
+    why they never caught the real defect: in the built image /app/media did not
+    exist, so Docker created the volume mount point as root and every upload
+    failed with PermissionError. This guard is image-level because the bug was.
+    """
+    from pathlib import Path
+
+    dockerfile = Path(__file__).resolve().parents[1] / "Dockerfile"
+    lines = dockerfile.read_text().splitlines()
+
+    setup = [i for i, line in enumerate(lines) if "mkdir -p /app/media" in line]
+    assert setup, "Dockerfile must create /app/media in the image, not rely on the volume mount"
+    assert "chown -R appuser:appuser /app" in lines[setup[0]], (
+        "/app/media must be chowned in the same layer that creates it"
+    )
+
+    switches = [i for i, line in enumerate(lines) if line.strip() == "USER appuser"]
+    assert switches, "Dockerfile must drop privileges to appuser"
+    assert setup[0] < switches[0], "the chown must run before the image drops to appuser"

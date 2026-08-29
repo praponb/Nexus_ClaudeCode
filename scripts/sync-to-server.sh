@@ -6,25 +6,34 @@
 #   ./scripts/sync-to-server.sh                    # to the default host below
 #   ./scripts/sync-to-server.sh prapon@10.0.0.5   # to somewhere else
 #   ./scripts/sync-to-server.sh --dry-run          # show what would change
+#   ./scripts/sync-to-server.sh --allow-dirty      # sync uncommitted work anyway
 #
 # WHY RSYNC AND NOT git clone: the repo is private, and this keeps GitHub
 # credentials off the deployment host entirely -- there is no deploy key, no
 # token, nothing to leak from a public-facing machine. The trade-off is that the
-# server has no git history and no `git pull`: THIS MAC IS THE SOURCE OF TRUTH
-# for what is deployed. Commit before syncing, or you will not be able to tell
-# later what is actually running out there.
+# server has no git history and no `git pull`.
+#
+# That trade-off is why this script REFUSES a dirty working tree unless you pass
+# --allow-dirty. An uncommitted change that reaches the server is untraceable
+# afterwards: nothing on either host records what it was. It also writes a
+# DEPLOYED_COMMIT file into the transfer, so the server itself carries the SHA
+# it is running instead of that fact living only in this Mac's working tree.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
 DEST_DEFAULT="prapon@192.168.1.49:~/inventory/"
 DRY_RUN=""
+ALLOW_DIRTY=""
 DEST=""
 
 for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY_RUN="--dry-run" ;;
-    -h|--help) sed -n '2,16p' "$0"; exit 0 ;;
+    --allow-dirty) ALLOW_DIRTY="yes" ;;
+    # Print the header block rather than a hardcoded line range, which silently
+    # goes stale the first time this comment grows.
+    -h|--help) awk 'NR>1 && /^set -euo pipefail/{exit} NR>1' "$0"; exit 0 ;;
     -*) echo "ERROR: unknown option '$arg'" >&2; exit 2 ;;
     *) DEST="$arg" ;;
   esac
@@ -70,10 +79,40 @@ EXCLUDES=(
   --exclude 'runs/'
 )
 
+GIT_SHA="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
+GIT_BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)"
+GIT_DIRTY="no"
 if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
-  echo "NOTE: working tree has uncommitted changes. They WILL be synced."
-  echo "      That is fine for iterating, but commit before a real deploy so the"
-  echo "      server's contents can be traced back to a commit."
+  GIT_DIRTY="yes"
+fi
+
+if [ "$GIT_DIRTY" = "yes" ] && [ -z "$ALLOW_DIRTY" ]; then
+  echo "ERROR: the working tree has uncommitted changes." >&2
+  echo >&2
+  git status --short >&2
+  echo >&2
+  echo "       The server has no git history, so whatever is synced from an" >&2
+  echo "       uncommitted tree cannot be traced back to anything afterwards." >&2
+  echo "       Commit first, or pass --allow-dirty if you are deliberately" >&2
+  echo "       iterating against the server." >&2
+  exit 1
+fi
+
+# Written AFTER the check above, so generating it can never be what makes the
+# tree dirty on the next run. It is gitignored for the same reason, and is not
+# in EXCLUDES, so it ships.
+cat > DEPLOYED_COMMIT <<EOF_STAMP
+commit=${GIT_SHA}
+branch=${GIT_BRANCH}
+dirty=${GIT_DIRTY}
+synced_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+synced_from=$(hostname -s) by $(id -un)
+EOF_STAMP
+
+if [ "$GIT_DIRTY" = "yes" ]; then
+  echo "WARNING: syncing an uncommitted tree (--allow-dirty)."
+  echo "         DEPLOYED_COMMIT will record dirty=yes, so the server at least"
+  echo "         says it is running something that is not in git."
   echo
 fi
 

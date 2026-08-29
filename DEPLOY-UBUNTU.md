@@ -236,6 +236,10 @@ user-visible.
 ./scripts/sync-to-server.sh --dry-run       # preview first, if you prefer
 ```
 
+The script refuses to run with uncommitted changes (`--allow-dirty` overrides),
+and writes `DEPLOYED_COMMIT` into the transfer so the server itself records the
+SHA it is running — otherwise that fact exists only in this Mac's working tree.
+
 The repo is private, and rsync keeps GitHub credentials off the deployment host
 entirely — no deploy key, no token, nothing to leak from a public-facing machine.
 

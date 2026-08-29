@@ -18,6 +18,10 @@ adk-venv/
 # scripts/export-app-env.sh writes the app-only secret bundle here before it is
 # scp'd to the server. It does NOT match `.env.*`, so it needs its own line.
 app.env
+# scripts/sync-to-server.sh stamps the deployed commit into the tree just before
+# rsync, so the server carries the SHA it is running. It must stay untracked, or
+# every sync would dirty the tree it just checked was clean.
+DEPLOYED_COMMIT
 # Checked-in placeholder templates (no real secrets) -- see ADR-006.
 !backend/.env
 !scripts/templates/.env
