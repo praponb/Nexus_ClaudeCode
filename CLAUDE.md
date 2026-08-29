@@ -45,9 +45,10 @@ procedure and rollback: `DEPLOY-UBUNTU.md`.
 - Full history, current accounts, and the operations runbook:
   `SESSION-2026-08-28-SECURITY.md`.
 - **Code reaches production via `scripts/sync-to-server.sh` (rsync), not git.**
-  The server has no remote and no history, so **this Mac's working tree is the
-  only record of what is deployed** — commit before syncing, or you cannot tell
-  later what is actually running.
+  The server has no remote and no history. The script therefore **refuses a dirty
+  working tree** (`--allow-dirty` to override) and stamps a `DEPLOYED_COMMIT`
+  file into the transfer, so the server records the SHA it is running:
+  `ssh prapon@192.168.1.49 'cat ~/inventory/DEPLOYED_COMMIT'`.
 - **Deploying means: sync, then rebuild on the server.**
   `./scripts/sync-to-server.sh` then, over ssh,
   `cd ~/inventory && ./scripts/backup.sh && docker compose build && docker compose up -d && ./scripts/migrate.sh`.
@@ -66,11 +67,16 @@ procedure and rollback: `DEPLOY-UBUNTU.md`.
   `twin-tunnel`, a separate compose project in `~/twin`). Never
   `docker system prune -a` or bulk-stop containers there — it would take an
   unrelated public site down.
-- Two pre-existing defects found during the migration, **both still open** and
-  reproducible on the standby Mac: attachment uploads fail with
-  `PermissionError` (`/app/media` is root-owned, the app runs as `appuser`), and
-  `verify_chain()` returns `False` (7 `auth.*` events, ids 403-409, whose
-  self-hash does not recompute). See `DEPLOY-UBUNTU.md` section 8.
+- Two pre-existing defects were found during the migration; both are now
+  resolved (2026-08-30). Attachment uploads failed with `PermissionError`
+  because `/app/media` did not exist in the image, so Docker created the volume
+  mount point root-owned — fixed in `backend/Dockerfile` and deployed.
+  `verify_chain()` still returns `False`, but it is **explained and benign**:
+  `AuditEvent.actor` is `SET_NULL` and the payload hashes `actor.uuid`, so
+  deleting a user invalidates that user's rows while leaving the chain links
+  intact. Diagnose with `python manage.py audit_chain_report` (read-only).
+  **Never run `reseal_chain()`** — it hides the discrepancy and destroys the
+  evidence. Details: `SESSION-2026-08-29-ISSUES.md` §2.
 
 ### On the standby Mac
 

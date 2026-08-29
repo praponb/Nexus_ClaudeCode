@@ -210,6 +210,7 @@ the Mac**.
 ./scripts/sync-to-server.sh              # -> prapon@192.168.1.49:~/inventory/
 ./scripts/sync-to-server.sh --dry-run    # preview
 ./scripts/sync-to-server.sh user@host    # somewhere else
+./scripts/sync-to-server.sh --allow-dirty  # sync uncommitted work on purpose
 ```
 
 Used instead of `git clone` so no GitHub credentials ever land on the
@@ -223,9 +224,48 @@ macOS ships `openrsync` (advertising "rsync 2.6.9 compatible"), which rejects
 rsync 3.x flags like `--info=`, so the script sticks to options both understand
 and picks up a newer rsync from Homebrew only if one is installed.
 
-**The server has no git history**, so this Mac is the source of truth for what
-is deployed — the script warns when the tree is dirty. Commit before a real
-deploy.
+**The server has no git history**, so the script **refuses to run** with a dirty
+working tree. An uncommitted change that reaches the server is untraceable
+afterwards — neither host records what it was. Commit first, or pass
+`--allow-dirty` when you are deliberately iterating against the server.
+
+Every sync writes a `DEPLOYED_COMMIT` file into the transfer (SHA, branch, dirty
+flag, timestamp, source host), so the server carries the identity of what it is
+running instead of that fact existing only in this Mac's working tree. It is
+generated after the dirty check and is gitignored, so producing it can never be
+what makes the next run dirty. To see what the server is running:
+
+```bash
+ssh prapon@192.168.1.49 'cat ~/inventory/DEPLOYED_COMMIT'
+```
+
+### `pull-backups.sh`
+Copies the server's dumps to this Mac. Run it **on the Mac**.
+
+```bash
+./scripts/pull-backups.sh                # <- prapon@192.168.1.49:~/inventory/backups/
+./scripts/pull-backups.sh --dry-run      # preview
+```
+
+`backup.sh` writes into `~/inventory/backups` on the server — the same physical
+disk as the Postgres volume it just dumped. That covers a bad migration or an
+accidental delete, and nothing at all if the drive fails. This script is the
+missing half.
+
+Lands in `$BACKUP_PULL_DIR` (default `~/inventory-backups`), keeps
+`$BACKUP_PULL_KEEP` (default 30) of each kind, and verifies the newest dump is a
+valid gzip stream before reporting success — a pull that silently copies nothing
+looks fine, which is worse than failing. Deliberately **not** `--delete`: the
+server prunes to 14, and mirroring that pruning would throw away the longer
+history that is the whole point of a second copy.
+
+Set `BACKUP_MIRROR_DIR` for a third copy (e.g. iCloud Drive). Treat it as a
+mirror only — with "Optimize Mac Storage" macOS may evict the local file and
+leave a placeholder, so recovery must never depend on a download.
+
+`com.praponb.inventory.pull-backups.plist` schedules it daily. It is **not
+installed by default**: this Mac is a cold standby and loading a LaunchAgent
+here is a deliberate decision, not a side effect of a code change.
 
 ### `inventory-backup.service` / `inventory-backup.timer`
 systemd units for the Ubuntu host — the Linux replacement for

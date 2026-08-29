@@ -21,16 +21,19 @@ testcase/
 └── evidence/                     Screenshots and artefacts captured during execution
 ```
 
-**Execution status as of 2026-08-29** (`execution-status.json`): 259 cases —
-183 passed, 69 blocked, 5 failed, 2 manual. Most blocks are "browser
-unavailable" carried from the original automated runs. The Help-page suite has
-since been executed against a real browser: 60 of 62 passed, with
+**Execution status as of 2026-08-30** (`execution-status.json`): 259 cases —
+187 passed, 69 blocked, 2 manual, 1 waived, **0 failed**. Most blocks are
+"browser unavailable" carried from the original automated runs. The Help-page
+suite has since been executed against a real browser: 60 of 62 passed, with
 `TC-HELP-05` (accessibility scan) and `TC-HELP-77` (forbidden-register alert)
 still blocked.
 
-> Some recorded failures are themselves stale — e.g. `TC-DEF-001-01` asserts the
-> root `compose.yaml` is absent (it exists) and `TC-DEF-002-01` expects a
-> `.env.example` that was removed deliberately. Re-run before acting on them.
+> The five recorded failures were all stale and were re-executed on 2026-08-30.
+> Four now pass — the root `compose.yaml` exists, `backend/uv.lock` exists, and
+> `npm audit` reports 0 vulnerabilities, which was the blocking DEF-104.
+> `TC-DEF-002-01` is **WAIVED**, not passed: it asserts a root `.env.example`
+> that the project deliberately dropped in favour of `scripts/templates/.env`,
+> so the criterion really is unmet and saying otherwise would be a false green.
 
 ## Conventions
 

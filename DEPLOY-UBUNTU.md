@@ -236,6 +236,10 @@ user-visible.
 ./scripts/sync-to-server.sh --dry-run       # preview first, if you prefer
 ```
 
+The script refuses to run with uncommitted changes (`--allow-dirty` overrides),
+and writes `DEPLOYED_COMMIT` into the transfer so the server itself records the
+SHA it is running — otherwise that fact exists only in this Mac's working tree.
+
 The repo is private, and rsync keeps GitHub credentials off the deployment host
 entirely — no deploy key, no token, nothing to leak from a public-facing machine.
 
@@ -450,7 +454,7 @@ Work through all of these before calling the migration done.
 | 1 | `docker compose ps` | six services up; postgres/redis healthy; only `127.0.0.1:8000` and `127.0.0.1:3000` published |
 | 2 | `curl -I https://inventory.praponb.com/` | 200, HSTS header present |
 | 3 | Row counts vs. the Mac | 100,213 assets, 7 users, 49 audit events |
-| 4 | `verify_chain()` on the audit log | **`False` on both hosts today** — pre-existing, see section 8. Match the Mac's result, don't expect `True` |
+| 4 | `verify_chain()` on the audit log | **`False` on both hosts** — expected, and explained in section 8 (a deleted actor, not tampering). Match the Mac's result, don't expect `True`; `python manage.py audit_chain_report` says why |
 | 5 | Sign in as `demo` in a browser | works; read-only (no create/edit, no audit view) |
 | 6 | Sign in as `praponb` with the **existing** authenticator | accepted — proves the TOTP secret survived |
 | 7 | 11 failed logins with rotating `X-Forwarded-For` | still cuts off at 10 |
@@ -615,9 +619,11 @@ Worth reading before the next deployment — every one of these cost time.
 
 ### Two pre-existing defects
 
-Neither is caused by the move — both reproduce identically on the standby Mac,
+Neither was caused by the move — both reproduced identically on the standby Mac,
 which was live production until 2026-08-29. They are recorded here because the
-migration is what surfaced them.
+migration is what surfaced them. **Both were resolved on 2026-08-30**; the
+resolutions are noted inline below, and the full account is in
+[`SESSION-2026-08-29-ISSUES.md`](SESSION-2026-08-29-ISSUES.md) §2.
 
 **1. Attachment uploads are broken (production).** The `backend_media` volume is
 `root:root`, while the backend container runs as `appuser` (uid 10001). The real
@@ -633,8 +639,13 @@ Any user who has tried to attach a file to an asset got an error. The fix is a
 `chown` of the media directory in `backend/Dockerfile` before `USER appuser`, so
 freshly created volumes inherit `appuser` ownership, plus a one-off
 `docker run --rm -v inventory_backend_media:/m alpine chown -R 10001:10001 /m`
-for volumes that already exist. **Not applied** — it is an app change, outside
-this migration.
+for volumes that already exist.
+
+> **FIXED 2026-08-30.** The Dockerfile now runs
+> `mkdir -p /app/media` in the same layer as the chown — creating the directory
+> *in the image* is what makes Docker give a new volume the right ownership. The
+> existing volume was chowned, the stack rebuilt, and a real `store_upload` call
+> verified in production: file written, owned by uid 10001, then removed.
 
 **2. `verify_chain()` returns `False`.** Seven audit events (ids 403–409, all
 `auth.*`: login, logout, `mfa.enroll`, `mfa.verify`) have `record_hash` values
@@ -645,8 +656,18 @@ the newest events, written during the 2FA work.
 
 `reseal_chain()` in `apps/audit/services.py` would make the check pass, but it
 recomputes hashes from whatever is stored — it papers over the discrepancy
-rather than explaining it, and destroys the evidence needed to diagnose it. Do
-not run it before deciding whether the underlying recording bug matters.
+rather than explaining it, and destroys the evidence needed to diagnose it.
+
+> **EXPLAINED 2026-08-30, and still not resealed.** All seven rows are accounted
+> for by a single deleted user (`75c2cb8f-…`) — a second `system_admin` created
+> and deleted during the 2FA work, **not** the old `admin` account, which was
+> renamed to `praponb` and kept its UUID. `AuditEvent.actor` is
+> `on_delete=SET_NULL` and `_payload_for()` hashes `actor.uuid`, so deleting a
+> user rewrites the payload of every event they caused while leaving `prev_hash`
+> untouched — links intact, individual rows disagreeing. Bookkeeping, not
+> tampering. Reproduce with `python manage.py audit_chain_report`, which is
+> read-only. The genuine finding underneath: **the deletion itself was never
+> audited.**
 
 ### Still outstanding
 
