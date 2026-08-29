@@ -15,6 +15,9 @@ adk-venv/
 # Env / secrets
 .env
 .env.*
+# scripts/export-app-env.sh writes the app-only secret bundle here before it is
+# scp'd to the server. It does NOT match `.env.*`, so it needs its own line.
+app.env
 # Checked-in placeholder templates (no real secrets) -- see ADR-006.
 !backend/.env
 !scripts/templates/.env

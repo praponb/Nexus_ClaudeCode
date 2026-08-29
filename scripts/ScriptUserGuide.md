@@ -128,10 +128,24 @@ Dumps the Postgres database with `pg_dump`, gzips it, and writes it to
 ./scripts/backup.sh
 ```
 
-This only backs up the database. Attachment files live in the
-`backend_media` Docker volume and are **not** included — snapshot that
-volume on the same schedule if you need a full recovery point. See
-`backend/docs/BACKUP_RESTORE.md` for the full backup/restore plan.
+Attachment files are captured too, as
+`backups/asset-inventory-media-<timestamp>.tar.gz`, sharing the database
+dump's timestamp so a restore can pair the two without guessing. A database
+dump on its own is a half backup: restoring it leaves every attachment row
+pointing at a file that is not there.
+
+If the media snapshot fails the script warns but still keeps the database
+dump — a media problem must never discard a good dump.
+
+Retention is `BACKUP_KEEP` (default 48) and prunes dumps and media tarballs
+independently. See `backend/docs/BACKUP_RESTORE.md` for the full plan.
+
+To restore the media alongside the database:
+
+```bash
+docker compose exec -T backend sh -c 'tar -xzf - -C /app/media' \
+  < backups/asset-inventory-media-<timestamp>.tar.gz
+```
 
 ### `restore.sh`
 **Destructive.** Drops and recreates the database, then restores it from
@@ -146,6 +160,79 @@ After restoring, run `./scripts/migrate.sh` to apply any migrations added
 since the backup was taken. Read `backend/docs/BACKUP_RESTORE.md` before
 using this for anything that matters — there is no confirmation prompt.
 
+### `export-app-env.sh`
+Extracts the Asset Inventory app's configuration out of the repo-root `.env`
+into a separate file, ready to `scp` to a deployment host.
+
+```bash
+./scripts/export-app-env.sh app.env
+scp app.env prapon@192.168.1.49:~/inventory/.env && rm app.env
+```
+
+The root `.env` is a *merged* file: it carries the `agentic_builder`
+orchestrator's paid API keys (`MODEL_API_KEY`, `GEMINI_API_KEY`) next to the web
+app's Django settings. This script is an **allowlist**, not an exclusion list —
+a key it does not name does not travel, including keys added later. It prints
+the names it carried and the names it left behind, and never echoes a value.
+
+The output is written mode 600 before anything is written into it, and `app.env`
+is git-ignored on its own line (it does not match the `.env.*` pattern).
+
+### `provision-ubuntu.sh`
+Prepares a fresh **Ubuntu 26.04 LTS** host to run the stack: base packages,
+Docker Engine + Compose, cloudflared, ufw, and a smoke test of the shell tools
+`backup.sh` relies on. Run it **on the server**, not the Mac.
+
+```bash
+./scripts/provision-ubuntu.sh --lan 192.168.1.0/24
+```
+
+`--lan` is mandatory unless you pass `--skip-firewall`: it becomes the SSH allow
+rule, and enabling ufw's default-deny policy without one locks you out of a
+remote machine for good.
+
+Three things it handles. Cloudflare's apt repo has no `resolute` suite (only
+`noble` and `jammy`), so cloudflared comes from its release `.deb` and is **not**
+apt-managed afterwards. Ubuntu now defaults to Rust reimplementations (uutils
+coreutils, sudo-rs), so `date`, `du`, `ls` and `tail` are smoke-tested rather
+than assumed. And it detects **conflicting Docker apt sources** — two entries
+with different `Signed-By` keyrings make apt refuse to read its *entire* source
+list, which is a hard stop for everything downstream.
+
+It is idempotent and skips anything already installed. See
+[DEPLOY-UBUNTU.md](../DEPLOY-UBUNTU.md#2-provision-the-server-once).
+
+### `sync-to-server.sh`
+Pushes this working tree to the Ubuntu deployment host over rsync. Run it **on
+the Mac**.
+
+```bash
+./scripts/sync-to-server.sh              # -> prapon@192.168.1.49:~/inventory/
+./scripts/sync-to-server.sh --dry-run    # preview
+./scripts/sync-to-server.sh user@host    # somewhere else
+```
+
+Used instead of `git clone` so no GitHub credentials ever land on the
+deployment host. It ships ~14 MB; `node_modules` and the `.venv`s are excluded
+because they hold **compiled arm64 binaries** that would be actively wrong on an
+amd64 server, and are rebuilt inside the Docker images anyway. `.env` and
+`backups/` are excluded for correctness — the server keeps its own, and rsync
+never deletes excluded paths on the receiver.
+
+macOS ships `openrsync` (advertising "rsync 2.6.9 compatible"), which rejects
+rsync 3.x flags like `--info=`, so the script sticks to options both understand
+and picks up a newer rsync from Homebrew only if one is installed.
+
+**The server has no git history**, so this Mac is the source of truth for what
+is deployed — the script warns when the tree is dirty. Commit before a real
+deploy.
+
+### `inventory-backup.service` / `inventory-backup.timer`
+systemd units for the Ubuntu host — the Linux replacement for
+`com.praponb.inventory.backup.plist`. Daily at 03:15 with `Persistent=true`, so
+a host that was off at 03:15 still runs the backup on its next boot. Configured
+for `User=prapon` and `/home/prapon/inventory`. See [DEPLOY-UBUNTU.md](../DEPLOY-UBUNTU.md#6-operations-on-the-new-host).
+
 ---
 
 ## Templates (`scripts/templates/`)
@@ -154,6 +241,7 @@ using this for anything that matters — there is no confirmation prompt.
 |---|---|
 | `compose.yaml` | Canonical Docker Compose stack definition (postgres, redis, backend, celery-worker, celery-beat, frontend). This is the source of truth per ADR-006 — the copy at the repo root (`compose.yaml`) should be treated as derived from this, under `backend/compose.yaml`. |
 | `.env` | Canonical environment variable reference with safe local-dev placeholder values and comments explaining each section. |
+| `cloudflared-config.yml` | Cloudflare Tunnel ingress config for a Linux host, installed to `/etc/cloudflared/config.yml`. Uses a `<TUNNEL_ID>` placeholder — the UUID is not a secret, but the `.json` credentials file it names is. |
 
 These exist under `scripts/templates/` (rather than shipping as
 `.env.example`/`compose.yaml` directly at the repo root) because of how

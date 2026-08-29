@@ -17,8 +17,12 @@ For what each script does and when to run it, see
 | `check.sh` | The six backend quality gates |
 | `export-openapi.sh` | Regenerate `backend/openapi.json` |
 | `backup.sh` / `restore.sh` | Database backup and restore (see `backend/docs/BACKUP_RESTORE.md`) |
-| `com.praponb.inventory.backup.plist` | launchd agent that runs `backup.sh` daily |
-| `templates/` | Canonical `compose.yaml` and `.env` for a fresh checkout |
+| `com.praponb.inventory.backup.plist` | launchd agent that runs `backup.sh` daily (macOS) |
+| `inventory-backup.service` / `.timer` | systemd equivalent for the Ubuntu host |
+| `export-app-env.sh` | Extract the app-only subset of the root `.env` for deployment |
+| `provision-ubuntu.sh` | Provision an Ubuntu 26.04 LTS host (Docker, cloudflared, ufw) |
+| `sync-to-server.sh` | rsync this working tree to the deployment host |
+| `templates/` | Canonical `compose.yaml`, `.env`, and cloudflared ingress config |
 
 `templates/` must stay in sync with the canonical `backend/compose.yaml` and
 `backend/.env`. A stale template silently reintroduces old defaults on a new

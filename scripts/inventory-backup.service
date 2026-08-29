@@ -1,0 +1,40 @@
+# Daily database + attachment backup for the Asset Inventory app (NFR-012).
+#
+# Linux replacement for com.praponb.inventory.backup.plist, which is macOS
+# launchd and does not apply on the Ubuntu host.
+#
+# INSTALL:
+#   sudo cp scripts/inventory-backup.{service,timer} /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now inventory-backup.timer
+#
+# Paths below match the actual deployment: /home/prapon/inventory, run as
+# `prapon` (the server account that holds the docker group membership -- note
+# this is NOT `praponb`, which is the Mac account and the Django admin user).
+
+[Unit]
+Description=Asset Inventory database backup
+# The script talks to the postgres container, so the daemon must be up first.
+# This orders the unit behind docker but does not start docker -- a backup on a
+# host where the stack is deliberately stopped should fail loudly, not silently
+# resurrect the stack.
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=prapon
+WorkingDirectory=/home/prapon/inventory
+ExecStart=/home/prapon/inventory/scripts/backup.sh
+
+# Keep the newest 14 dumps. backup.sh prunes to this on every run; without it
+# the directory grows without bound.
+Environment=BACKUP_KEEP=14
+
+# systemd services start with a near-empty PATH; docker lives outside it.
+Environment=PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+
+# A failed backup must be visible. Journal it and let `systemctl status` show
+# the failure rather than exiting 0 on a broken dump.
+StandardOutput=journal
+StandardError=journal

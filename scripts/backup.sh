@@ -32,19 +32,34 @@ docker compose exec -T postgres pg_dump -U "${POSTGRES_USER}" -d "${POSTGRES_DB}
 
 echo "==> Backup complete: ${DEST} ($(du -h "${DEST}" | cut -f1))"
 
+# Attachment media. A database dump alone is a half backup: restoring it leaves
+# every attachment row pointing at a file that is not there. Dumped alongside,
+# with the same stamp, so a restore can pair the two without guessing.
+MEDIA_DEST="${DEST_DIR}/asset-inventory-media-${STAMP}.tar.gz"
+echo "==> Dumping attachment media to ${MEDIA_DEST}"
+if docker compose exec -T backend tar -czf - -C /app/media . > "${MEDIA_DEST}" 2>/dev/null; then
+  echo "==> Media backup complete: ${MEDIA_DEST} ($(du -h "${MEDIA_DEST}" | cut -f1))"
+else
+  # Never let a media failure discard the database dump that already succeeded.
+  rm -f "${MEDIA_DEST}"
+  echo "==> WARNING: media snapshot failed; the database dump above is still good." >&2
+fi
+
 # Retention. Without this the directory grows without bound once the LaunchAgent
 # runs this hourly. Keep the newest BACKUP_KEEP dumps.
 BACKUP_KEEP="${BACKUP_KEEP:-48}"
 PRUNED=0
-while IFS= read -r stale; do
-  [ -n "$stale" ] || continue
-  rm -f "$stale"
-  PRUNED=$((PRUNED + 1))
-done <<EOF_PRUNE
-$(ls -1t "${DEST_DIR}"/asset-inventory-*.sql.gz 2>/dev/null | tail -n "+$((BACKUP_KEEP + 1))")
+prune_glob() {
+  while IFS= read -r stale; do
+    [ -n "$stale" ] || continue
+    rm -f "$stale"
+    PRUNED=$((PRUNED + 1))
+  done <<EOF_PRUNE
+$(ls -1t $1 2>/dev/null | tail -n "+$((BACKUP_KEEP + 1))")
 EOF_PRUNE
+}
+prune_glob "${DEST_DIR}/asset-inventory-*.sql.gz"
+prune_glob "${DEST_DIR}/asset-inventory-media-*.tar.gz"
 if [ "$PRUNED" -gt 0 ]; then
   echo "==> Pruned ${PRUNED} backup(s) beyond the newest ${BACKUP_KEEP}."
 fi
-
-echo "==> Reminder: snapshot the attachment volume (backend_media) on the same schedule."

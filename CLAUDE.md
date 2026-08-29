@@ -35,19 +35,54 @@ at <https://inventory.praponb.com>, reachable by anyone, with no Cloudflare
 Access in front. **Changes here reach the public internet.** The Django login is
 the only gate.
 
+**Production moved off this Mac on 2026-08-29.** It now runs on an Ubuntu 26.04
+LTS server: `prapon@192.168.1.49`, deployed at `~/inventory`, serving the same
+Cloudflare Tunnel as before, now as a systemd `cloudflared` service. The MacBook is a **cold
+standby** — containers stopped, volumes intact, both LaunchAgents unloaded. Full
+procedure and rollback: `DEPLOY-UBUNTU.md`.
+
 - Full history, current accounts, and the operations runbook:
   `SESSION-2026-08-28-SECURITY.md`.
+- **Code reaches production via `scripts/sync-to-server.sh` (rsync), not git.**
+  The server has no remote and no history, so **this Mac's working tree is the
+  only record of what is deployed** — commit before syncing, or you cannot tell
+  later what is actually running.
+- **Deploying means: sync, then rebuild on the server.**
+  `./scripts/sync-to-server.sh` then, over ssh,
+  `cd ~/inventory && ./scripts/backup.sh && docker compose build && docker compose up -d && ./scripts/migrate.sh`.
 - Backend gates: `./scripts/check.sh` (six gates). It falls back to a one-off
   dev-stage container automatically, because the deployed image is the
-  production target and carries no ruff/mypy/pytest.
+  production target and carries no ruff/mypy/pytest. Gates run on the **Mac**;
+  starting the local stack for them no longer affects production.
 - Frontend gates: `cd frontend && npm run lint && npm run typecheck && npm run test`.
-- **Editing `compose.yaml` triggers an unattended `docker compose up -d` within
-  5 minutes** — a launchd watchdog polls on that interval. A half-finished edit
-  can take the site down. Check
-  `~/Library/Logs/inventory-stack-autostart.log` afterwards.
 - The real root `.env` is gitignored, so production configuration is not in git
-  and a regression there leaves no trace. Verify the *running* config
-  (`docker compose exec backend python -c "...settings.DEBUG"`), not the repo.
+  and a regression there leaves no trace. Verify the *running* config on the
+  server, not the repo. It is also a *merged* file: it holds the orchestrator's
+  `MODEL_*` / `GEMINI_API_KEY` secrets next to the web app's Django settings.
+  Never copy it wholesale to an app host — `scripts/export-app-env.sh` extracts
+  the app subset by allowlist, and is what wrote the server's `.env`.
+- **The server also hosts `chatbot.praponb.com`** (containers `twin`,
+  `twin-tunnel`, a separate compose project in `~/twin`). Never
+  `docker system prune -a` or bulk-stop containers there — it would take an
+  unrelated public site down.
+- Two pre-existing defects found during the migration, **both still open** and
+  reproducible on the standby Mac: attachment uploads fail with
+  `PermissionError` (`/app/media` is root-owned, the app runs as `appuser`), and
+  `verify_chain()` returns `False` (7 `auth.*` events, ids 403-409, whose
+  self-hash does not recompute). See `DEPLOY-UBUNTU.md` section 8.
+
+### On the standby Mac
+
+- Both LaunchAgents (`com.nexus.inventory-autostart`,
+  `com.praponb.inventory.backup`) are **unloaded**. The 5-minute watchdog that
+  made editing `compose.yaml` dangerous is therefore inert — but reload it and
+  that hazard returns.
+- The tunnel LaunchDaemon (`/Library/LaunchDaemons/com.cloudflare.cloudflared.plist`)
+  is **booted out**. Restoring it is the rollback step, and must never run while
+  the server's tunnel is up — one tunnel, one host, or Cloudflare load-balances
+  across two diverging databases.
+- `jobs4dent` and `twin` LaunchAgents were `launchctl disable`d on 2026-08-29.
+  Renaming a plist does **not** disable it; only `launchctl disable` persists.
 
 ## Ownership boundaries (enforced in code, not just convention)
 
