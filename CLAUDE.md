@@ -28,6 +28,63 @@ All four quality gates (`ruff check`, `ruff format --check`, `mypy src`,
 `pytest`) must pass before considering a change done. The test suite runs
 entirely offline against the `FakeLlm` double -- no credentials needed.
 
+## The generated app is live and public
+
+`backend/` + `frontend/` are not just build output any more: they are deployed
+at <https://inventory.praponb.com>, reachable by anyone, with no Cloudflare
+Access in front. **Changes here reach the public internet.** The Django login is
+the only gate.
+
+**Production moved off this Mac on 2026-08-29.** It now runs on an Ubuntu 26.04
+LTS server: `prapon@192.168.1.49`, deployed at `~/inventory`, serving the same
+Cloudflare Tunnel as before, now as a systemd `cloudflared` service. The MacBook is a **cold
+standby** — containers stopped, volumes intact, both LaunchAgents unloaded. Full
+procedure and rollback: `DEPLOY-UBUNTU.md`.
+
+- **Open issues and anything needing action: `SESSION-2026-08-29-ISSUES.md`.**
+- Full history, current accounts, and the operations runbook:
+  `SESSION-2026-08-28-SECURITY.md`.
+- **Code reaches production via `scripts/sync-to-server.sh` (rsync), not git.**
+  The server has no remote and no history, so **this Mac's working tree is the
+  only record of what is deployed** — commit before syncing, or you cannot tell
+  later what is actually running.
+- **Deploying means: sync, then rebuild on the server.**
+  `./scripts/sync-to-server.sh` then, over ssh,
+  `cd ~/inventory && ./scripts/backup.sh && docker compose build && docker compose up -d && ./scripts/migrate.sh`.
+- Backend gates: `./scripts/check.sh` (six gates). It falls back to a one-off
+  dev-stage container automatically, because the deployed image is the
+  production target and carries no ruff/mypy/pytest. Gates run on the **Mac**;
+  starting the local stack for them no longer affects production.
+- Frontend gates: `cd frontend && npm run lint && npm run typecheck && npm run test`.
+- The real root `.env` is gitignored, so production configuration is not in git
+  and a regression there leaves no trace. Verify the *running* config on the
+  server, not the repo. It is also a *merged* file: it holds the orchestrator's
+  `MODEL_*` / `GEMINI_API_KEY` secrets next to the web app's Django settings.
+  Never copy it wholesale to an app host — `scripts/export-app-env.sh` extracts
+  the app subset by allowlist, and is what wrote the server's `.env`.
+- **The server also hosts `chatbot.praponb.com`** (containers `twin`,
+  `twin-tunnel`, a separate compose project in `~/twin`). Never
+  `docker system prune -a` or bulk-stop containers there — it would take an
+  unrelated public site down.
+- Two pre-existing defects found during the migration, **both still open** and
+  reproducible on the standby Mac: attachment uploads fail with
+  `PermissionError` (`/app/media` is root-owned, the app runs as `appuser`), and
+  `verify_chain()` returns `False` (7 `auth.*` events, ids 403-409, whose
+  self-hash does not recompute). See `DEPLOY-UBUNTU.md` section 8.
+
+### On the standby Mac
+
+- Both LaunchAgents (`com.nexus.inventory-autostart`,
+  `com.praponb.inventory.backup`) are **unloaded**. The 5-minute watchdog that
+  made editing `compose.yaml` dangerous is therefore inert — but reload it and
+  that hazard returns.
+- The tunnel LaunchDaemon (`/Library/LaunchDaemons/com.cloudflare.cloudflared.plist`)
+  is **booted out**. Restoring it is the rollback step, and must never run while
+  the server's tunnel is up — one tunnel, one host, or Cloudflare load-balances
+  across two diverging databases.
+- `jobs4dent` and `twin` LaunchAgents were `launchctl disable`d on 2026-08-29.
+  Renaming a plist does **not** disable it; only `launchctl disable` persists.
+
 ## Ownership boundaries (enforced in code, not just convention)
 
 | Owner | Path |
@@ -85,3 +142,22 @@ requirement; fail with `ConfigError`/`ModelResolutionError` instead. See
   traversal guard) and `events.atomic_write_text`/`atomic_write_json`.
 - Secrets are masked via `config.mask_secrets` everywhere text is logged,
   persisted to `events.jsonl`, or shown in CLI error output.
+
+Invariants for the deployed app (`backend/`) -- same rule, do not weaken
+without discussion:
+
+- Client identity for throttling and audit comes from
+  `apps/core/client_ip.py`, which trusts one configured header then
+  `REMOTE_ADDR`. **Never key on `X-Forwarded-For`** -- it is caller-supplied,
+  so rotating it buys a fresh throttle bucket per request, and it once reached
+  a Postgres `inet` column unvalidated (an unauthenticated 500).
+- Throttle counters must live in a *shared* cache. Django's default
+  `LocMemCache` is per-process: under `gunicorn --workers 3` it multiplies
+  every configured rate by three and resets on each deploy.
+- Dev throttle ceilings belong in `local.py`/`test.py` only. A permissive rate
+  in `base.py` silently disables protection in production *and* makes those
+  overrides look like no-ops -- which is exactly how it went unnoticed before.
+- `POST /auth/login/` must not establish a session for an MFA-required role
+  until the second factor is satisfied.
+- The public `demo` account stays exempt from per-account lockout; locking a
+  shared published account denies every visitor at once.

@@ -55,7 +55,7 @@ Native mobile apps, network discovery, remote device control, procurement/PO pro
 
 ## 4. Personas and User Journeys
 
-Personas (mapped to Django groups, see §11): System Administrator, Asset Manager, Department Manager, Inventory Operator/Technician, Employee/Custodian, Auditor (read-only).
+Personas (mapped to Django groups, see §11): System Administrator, Asset Manager, Department Manager, Inventory Operator/Technician, Employee/Custodian, Auditor (read-only), Viewer (read-only, added 2026-08-28 for the public demo — global read of the register with no write, no finance fields, and deliberately no audit-log access, since audit rows carry client IP addresses).
 
 Key journeys (from specification.md §11, all must pass E2E):
 1. Register and assign a new laptop (operator → employee acknowledgement).
@@ -231,7 +231,7 @@ AppShell
 
 ### 10.3 Migrations and seed data
 - One initial migration per app; constraints (unique asset_tag, partial unique active assignment, check constraints for date ordering where expressible, e.g. warranty_end ≥ warranty_start).
-- `seed-dev.sh` runs a management command creating: groups/permissions for the 6 roles; default statuses (13 per spec §8.1) with transition map; conditions (6); demo departments (3), locations (2 sites), cost centers, suppliers, categories (Laptop, Monitor, Phone, Furniture, Vehicle-equipment) with attribute definitions; users `admin`, `manager`, `operator`, `deptmanager`, `employee`, `auditor` (password `change-me-dev` documented, dev only); ~50 sample assets with assignments, maintenance, one stocktake. No real personal data.
+- `seed-dev.sh` runs a management command creating: groups/permissions for the 6 seeded roles; default statuses (13 per spec §8.1) with transition map; conditions (6); demo departments (3), locations (2 sites), cost centers, suppliers, categories (Laptop, Monitor, Phone, Furniture, Vehicle-equipment) with attribute definitions; users `admin`, `manager`, `operator`, `deptmanager`, `employee`, `auditor` (password `change-me-dev` documented, dev only); ~50 sample assets with assignments, maintenance, one stocktake. No real personal data.
 
 ### 10.4 Indexing
 Indexes on: asset_tag (unique), serial_number, (status), (condition), (category), (custodian), (department), (location), warranty_end, next_maintenance_due, created_at/updated_at, (external_source, external_id); trigram (`pg_trgm`) indexes on name/serial/asset_tag for search; assignments (asset, status) partial; audit (target_type, target_id), (at).
@@ -276,11 +276,14 @@ Status codes: 200/201/204; 400 VALIDATION_ERROR; 401; 403; 404; 409; 429; 500 (g
 ## 12. Security, Privacy, Logging, Error Handling
 
 - Transport: HTTPS outside dev; HSTS, secure headers middleware; restrictive CSP (no inline scripts beyond nonce'd theme bootstrap); CORS explicit allowlist; CSRF on cookie-authenticated mutations (double-submit via `X-CSRFToken`).
-- Sessions: HttpOnly/Secure/SameSite=Lax cookies, 8h idle timeout (configurable), rotation on login; expired → 401 → UI redirect. Never tokens in localStorage.
-- Rate limiting (Redis-backed) on login, search, import/export, scan-lookup.
+- Sessions: HttpOnly/Secure/SameSite=Lax cookies, 30-minute idle timeout (`SESSION_IDLE_SECONDS`, sliding), rotation on login; expired → 401 → UI redirect. Never tokens in localStorage.
+- Rate limiting (Redis-backed) on login, search, and import/export. Implemented 2026-08-28: throttle counters live in the default cache, which must be Redis — the Django default (`LocMemCache`) is per-process and would multiply every limit by the gunicorn worker count and reset it on each deploy.
+- Throttle identity comes from one explicitly trusted client-IP header (`TRUSTED_CLIENT_IP_HEADER`, `CF-Connecting-IP` behind Cloudflare) then `REMOTE_ADDR`. **`X-Forwarded-For` is never trusted** — it is caller-supplied, so keying on it lets an attacker rotate the header for a fresh bucket per request.
+- Per-account lockout on failed sign-ins, counted per username so a distributed attack cannot sidestep the per-IP limit. Counted for unknown usernames too, so the lockout cannot be used to enumerate accounts; exempt usernames are configurable for shared public accounts.
+- Two-factor authentication (TOTP, RFC 6238) required for roles in `MFA_REQUIRED_ROLES`. Sign-in is two-phase and never establishes a session until the second factor is satisfied. Recovery codes are single-use and stored hashed; a used time-step is recorded to refuse replay.
 - Input: server-side validation everywhere; ORM parameterization; CSV formula-injection mitigation in/out; upload type+signature+size validation; filenames sanitized; downloads authorized per request.
 - Output: Vue auto-escaping; no `v-html` on user data; API errors never leak stack traces/paths/settings; generic 500 with correlation_id.
-- Secrets: `.env.example` only names/placeholders; production settings fail fast on missing/insecure values; DEBUG off in production; ALLOWED_HOSTS/CSRF trusted origins explicit.
+- Secrets: the checked-in `backend/.env` and `scripts/templates/.env` hold names/placeholders only (there is deliberately no `.env.example`); production settings fail fast on missing or insecure values; DEBUG off in production; ALLOWED_HOSTS/CSRF trusted origins explicit. The real root `.env` is gitignored — which also means production configuration is not backed up by `git push`, and a regression there leaves no trace in git.
 - Privacy: employee PII limited to name/email/department; financial fields (purchase_price, costs, proceeds) gated by `view_financials` permission at serializer level and excluded from exports/reports when unauthorized.
 - Logging: structured JSON via `structlog`-style config (timestamp, level, service, correlation_id from `X-Correlation-ID` middleware, user id hash); correlation ID created at Nuxt, forwarded to Celery tasks; PII/secrets masked; audit events (business) kept separate from diagnostic logs.
 

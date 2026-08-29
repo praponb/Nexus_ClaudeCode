@@ -1,0 +1,21 @@
+# Timer for inventory-backup.service. See that file for install instructions.
+
+[Unit]
+Description=Daily Asset Inventory backup
+
+[Timer]
+# 03:15 local time daily. A fixed wall-clock time (rather than the LaunchAgent's
+# rolling 86400s interval) keeps the backup in the quiet hours no matter when
+# the host was last rebooted.
+OnCalendar=*-*-* 03:15:00
+
+# Run a missed backup on the next boot. Without this a host that is off at 03:15
+# simply skips that day.
+Persistent=true
+
+# Spread the start across 5 minutes so the backup never collides exactly with
+# any other timer scheduled on the same minute.
+RandomizedDelaySec=5m
+
+[Install]
+WantedBy=timers.target

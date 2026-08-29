@@ -24,7 +24,7 @@ Only public values are exposed to the browser:
 | --- | --- | --- |
 | `NUXT_PUBLIC_API_BASE_URL` | `http://localhost:8000/api/v1` | Backend v1 API base URL |
 | `E2E_BASE_URL` | `http://localhost:3000` | Playwright target (E2E only) |
-| `E2E_ADMIN_USER` / `E2E_ADMIN_PASSWORD` | `admin` / unset | Seeded dev user for authenticated E2E |
+| `E2E_ADMIN_USER` / `E2E_ADMIN_PASSWORD` | `admin` / unset | Seeded dev user for authenticated E2E. Local stacks only — on the deployed instance the administrator is renamed and requires a TOTP code, which these tests cannot supply. Point them at a non-MFA role instead. |
 | `E2E_API_BASE_URL` | `http://localhost:8000/api/v1` | Direct API calls in E2E (conflict simulation) |
 
 ## Feature map

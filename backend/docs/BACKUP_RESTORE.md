@@ -19,6 +19,41 @@ a second failure domain. Local dev backups land in `backups/` (git-ignored).
 # -> backups/asset-inventory-<UTC timestamp>.sql.gz
 ```
 
+`backup.sh` prunes to the newest `BACKUP_KEEP` dumps (default 48) after each
+run — without that, scheduling it would grow the directory without bound.
+
+### Scheduled backups (macOS)
+
+Installed as a user LaunchAgent, so it needs no root:
+
+```bash
+cp scripts/com.praponb.inventory.backup.plist ~/Library/LaunchAgents/
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.praponb.inventory.backup.plist
+```
+
+Runs daily (`StartInterval 86400`) with `BACKUP_KEEP=14`, plus once at load so
+a machine that was asleep is not left a full day behind. Log:
+`~/Library/Logs/com.praponb.inventory.backup.log`.
+
+Two things that will silently break it if changed: `PATH` must be set
+explicitly in the plist (launchd gives a job a minimal `PATH` with no `docker`),
+and `KeepAlive` must stay absent (this is a periodic task, not a daemon — with
+`KeepAlive` launchd would restart it the moment it exits and back up in a loop).
+
+> **Verify a backup, don't assume it.** Restore into a scratch database and
+> compare row counts, rather than pointing `restore.sh` at the live one:
+>
+> ```bash
+> docker compose exec -T postgres psql -U asset_inventory -d postgres \
+>   -c "CREATE DATABASE restore_probe;"
+> gunzip -c backups/<file>.sql.gz | \
+>   docker compose exec -T postgres psql -q -U asset_inventory -d restore_probe
+> docker compose exec -T postgres psql -tA -U asset_inventory -d restore_probe \
+>   -c "SELECT count(*) FROM assets_asset;"
+> docker compose exec -T postgres psql -U asset_inventory -d postgres \
+>   -c "DROP DATABASE restore_probe;"
+> ```
+
 ## Restore (documented drill — perform once per release)
 
 1. Stop writers: `docker compose stop backend celery-worker celery-beat`.

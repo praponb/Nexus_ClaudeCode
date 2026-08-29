@@ -1,10 +1,19 @@
 # Asset Inventory — security session, 2026-08-28
 
+> **Superseded in part on 2026-08-29:** production moved off this MacBook to
+> an Ubuntu 26.04 server. The security work described here is unchanged and
+> still in force; only the *host* details differ. Current operations:
+> `DEPLOY-UBUNTU.md`.
+
 What happened, why, and how to operate what came out of it.
 
 The session started with "I lost my admin password" and ended with
 `inventory.praponb.com` publicly reachable and hardened. The password turned out
 not to be lost; looking for it surfaced everything else.
+
+**Superseded:** for anything still needing action, read
+`SESSION-2026-08-29-ISSUES.md` instead — the outstanding list below has since
+been partly completed (2FA enrolment is done) and is kept only as history.
 
 **Start here:** [Outstanding actions](#outstanding-actions) — 2FA enrolment is
 unfinished, which currently blocks admin sign-in.
@@ -219,16 +228,24 @@ docker compose exec backend python -c "import django; django.setup(); \
 docker compose exec postgres psql -U asset_inventory -d asset_inventory
 ```
 
-**If the site is unreachable**, in order:
+**If the site is unreachable**, in order. Note the host changed on 2026-08-29 —
+everything below now runs on the Ubuntu server (`ssh prapon@192.168.1.49`), not
+this Mac. See `DEPLOY-UBUNTU.md`.
 
-1. `curl https://inventory.praponb.com/api/v1/health/ready/` — bypasses nothing
-   now, but a non-200 means the stack is down.
-2. `docker info` — if this fails, Docker Desktop is dead. This is the single
-   most likely cause of a 502. `open -a Docker`, then `docker compose up -d`.
-3. `tail ~/Library/Logs/inventory-stack-autostart.log` — watchdog history.
-4. `pgrep -fl cloudflared` — only if the origin is confirmed healthy.
+1. `curl https://inventory.praponb.com/api/v1/health/ready/` — a non-200 means
+   the stack is down.
+2. `ssh prapon@192.168.1.49 'cd ~/inventory && docker compose ps'` — all six
+   services should be up, postgres/redis healthy.
+3. `systemctl status cloudflared` on the server — only if the origin is
+   confirmed healthy. `journalctl -u cloudflared -n 50` for detail.
+4. `systemctl status docker` — unlike Docker Desktop on the Mac, this is a
+   normal system service and rarely the culprit.
 
 A 502 with Cloudflare "Working" / Host "Error" always means the origin.
+
+**The Docker Desktop failure mode below no longer applies to production.** It
+was the single most likely cause of a 502 while the Mac was the host; the Mac is
+now a stopped cold standby. Kept for the history and for local development.
 
 ### Security posture
 

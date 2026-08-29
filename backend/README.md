@@ -82,16 +82,55 @@ PostgreSQL role matching the current OS user against `localhost:5432`.
 
 `seed_dev` creates `admin`, `manager`, `deptmgr`, `operator`, `employee`,
 `auditor`. Passwords come from `SEED_DEMO_PASSWORD`; if unset, a random password
-is generated and printed once. Never use these users outside local dev.
+is generated and printed once. Note it only sets a password when it *creates* a
+user, so re-running it will not reset an existing account. Never use these users
+outside local dev.
+
+`seed_dev` does not create a `viewer`; add one by hand to exercise that role.
+
+On the deployed instance these seeded accounts are **deactivated** — only a
+read-only `demo` account and a renamed administrator are active.
 
 ## Auth model
 
 Session-cookie auth (`POST /api/v1/auth/login/`), CSRF cookie via
 `GET /api/v1/auth/csrf/`, session bootstrap via `GET /api/v1/auth/me/`. Session
-keys rotate on login; login attempts are rate-limited (HTTP 429 `RATE_LIMITED`).
-Local auth is disabled in production settings unless `LOCAL_AUTH_ENABLED=true`
-**and** `LOCAL_AUTH_ALLOW_IN_PRODUCTION=true` (design D-01). OIDC SSO is the
-documented production target (deferred).
+keys rotate on login. Local auth is disabled in production settings unless
+`LOCAL_AUTH_ENABLED=true` **and** `LOCAL_AUTH_ALLOW_IN_PRODUCTION=true`
+(design D-01). OIDC SSO is the documented production target (deferred).
+
+Three controls guard the login, since on a public deployment it is the only gate:
+
+- **Per-IP throttle** — `LoginThrottle`, 10/minute, HTTP 429 `RATE_LIMITED`.
+  Identity comes from `apps/core/client_ip.py`, which trusts only
+  `TRUSTED_CLIENT_IP_HEADER` then `REMOTE_ADDR` and **never** `X-Forwarded-For`
+  (caller-supplied; keying on it allows a fresh bucket per request).
+- **Per-account lockout** — `apps/core/login_guard.py`, counted per username in
+  the cache so a distributed attack cannot sidestep the per-IP limit. Failures
+  only, cleared on success, HTTP 429 `ACCOUNT_LOCKED`. Unknown usernames are
+  counted too so the lockout cannot enumerate accounts. Unlock early with
+  `login_guard.reset('<username>')`.
+- **TOTP second factor** — `apps/accounts/mfa.py` (pyotp), required for roles in
+  `MFA_REQUIRED_ROLES`. `POST /auth/login/` returns
+  `{"mfa_required": true, "stage": "setup"|"verify"}` and **does not sign the
+  user in**; the flow completes via `POST /auth/2fa/setup/`,
+  `POST /auth/2fa/confirm/`, or `POST /auth/2fa/verify/` (which also accepts a
+  single-use `recovery_code`). Between the two steps the caller holds only an
+  unauthenticated session carrying a pending user id and a 5-minute deadline.
+
+| Setting | Default | Purpose |
+|---|---|---|
+| `LOGIN_LOCKOUT_THRESHOLD` | `10` | Failed attempts per account before refusal |
+| `LOGIN_LOCKOUT_WINDOW_SECONDS` | `900` | Window the count applies over |
+| `LOGIN_LOCKOUT_EXEMPT_USERNAMES` | `demo` | Never lockable — shared public accounts |
+| `MFA_REQUIRED_ROLES` | `system_admin` | Roles obliged to hold a second factor |
+| `MFA_ISSUER` | `Asset Inventory` | Name shown in the authenticator app |
+| `TRUSTED_CLIENT_IP_HEADER` | *(empty)* | META key the edge overwrites, e.g. `HTTP_CF_CONNECTING_IP` |
+| `CACHE_URL` | `redis://localhost:6379/3` | Backs the throttle counters; **must be shared**, not per-process |
+
+`config.settings.local` overrides the cache with `LocMemCache` so bare-metal
+development needs no Redis; compose and production use Redis db 3 (dbs 1 and 2
+are the Celery broker/results).
 
 ## API conventions
 
