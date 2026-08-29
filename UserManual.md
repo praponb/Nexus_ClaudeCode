@@ -30,7 +30,8 @@ signed in.
 
 Go to `/login` and sign in (see [FAQ.md](FAQ.md#what-do-i-log-in-with) for the
 account list) — `http://localhost:3000/login` for a local stack, or
-<https://inventory.praponb.com/login> for the deployed one. After signing in
+<https://inventory.praponb.com/login> for the deployed one (hosted on a
+dedicated Ubuntu server since 2026-08-29; the URL is unchanged). After signing in
 you land on the Dashboard.
 
 **If your account requires two-factor authentication** (administrators do),
@@ -239,6 +240,11 @@ Everything below lives in `scripts/` at the repo root, and (except
 `install-root-files.sh`) targets the **Docker Compose stack** by default
 — run `./scripts/dev-up.sh` first. All scripts are safe to re-run.
 
+Note which machine each one belongs on. Most operate on whatever stack is
+running locally; `sync-to-server.sh` and `export-app-env.sh` run on your own
+machine and act *on* the server, while `provision-ubuntu.sh` runs on the server
+itself. Deployment procedure: [`DEPLOY-UBUNTU.md`](DEPLOY-UBUNTU.md).
+
 | Script | What it does | When to use it |
 |---|---|---|
 | `install-root-files.sh` | One-time: copies the canonical `compose.yaml` and `.env` templates to the repo root, without overwriting anything already there. | Once, on a fresh checkout, before first use. |
@@ -248,7 +254,10 @@ Everything below lives in `scripts/` at the repo root, and (except
 | `seed-dev.sh` | Runs the `seed_dev` management command (creates demo users + ~200 sample assets). Idempotent — safe to re-run. | After a fresh `migrate`, or to reset demo data. |
 | `check.sh` | Runs all six backend quality gates in order: `ruff format --check`, `ruff check`, `mypy`, `makemigrations --check --dry-run`, `check --deploy`, `pytest`. Prefers the running backend container, but that only carries ruff/mypy/pytest when built from the `dev` stage — against a `BACKEND_BUILD_TARGET=production` stack it automatically falls back to a one-off dev-stage container. Set `CHECK_MODE=local` to run against a host-installed venv instead. | Before committing/pushing backend changes. |
 | `export-openapi.sh` | Regenerates `backend/openapi.json` from the live schema (via drf-spectacular) and validates it. | After changing any backend API (serializers/views/urls). |
-| `backup.sh` | Dumps the Postgres database with `pg_dump`, gzips it to `backups/<timestamp>.sql.gz` (git-ignored), then prunes to the newest `BACKUP_KEEP` dumps (default 48). Reminds you to also snapshot the attachment media volume on the same schedule. | Runs daily on its own via the `com.praponb.inventory.backup` LaunchAgent; run it by hand before risky changes. See `backend/docs/BACKUP_RESTORE.md`. |
+| `backup.sh` | Dumps the Postgres database with `pg_dump` to `backups/<timestamp>.sql.gz` **and** tars the attachment volume to `backups/<timestamp>-media.tar.gz` with a matching stamp, so a restore can pair the two. Prunes both to the newest `BACKUP_KEEP` (default 48). | Runs daily on the server via the `inventory-backup` systemd timer (keep 14); run it by hand before risky changes. See `backend/docs/BACKUP_RESTORE.md`. |
+| `provision-ubuntu.sh --lan <cidr>` | Prepares a fresh Ubuntu 26.04 host: base packages, Docker, cloudflared, firewall, and a smoke test of the shell tools `backup.sh` depends on. Refuses to run without `--lan`, which becomes the SSH allow rule. | Once, when building a new deployment host. Run **on the server**. |
+| `sync-to-server.sh` | rsyncs the working tree to the deployment host. Excludes `node_modules`/`.venv` (wrong architecture for the server) and `.env`/`backups/` (the server keeps its own). Warns if the tree is dirty. | Every deploy. Run **on your machine**, not the server. |
+| `export-app-env.sh` | Extracts the application's configuration from the repo-root `.env` by allowlist, ready to copy to a server. Never carries the orchestrator's API keys. | When setting up or reconfiguring a deployment host. |
 | `restore.sh <file.sql.gz>` | **Destructive.** Drops and recreates the database, then restores the given backup into it. Refuses to run if `APP_ENV=production`. Run `migrate.sh` afterward for any migrations created since that backup. | Disaster recovery, or restoring a known-good snapshot locally. |
 
 For the full backup/restore drill procedure (including the audit-chain

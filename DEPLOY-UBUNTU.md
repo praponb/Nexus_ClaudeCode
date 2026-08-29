@@ -534,6 +534,40 @@ from this Mac.
 
 ## 7. The Mac as cold standby
 
+> ### ⚠️ Unloading a LaunchAgent does not survive a reboot
+>
+> This is the single most dangerous thing about the standby Mac, and it was
+> nearly discovered the hard way on 2026-08-29 when a restart was proposed.
+>
+> `launchctl unload` and `launchctl bootout` affect only the **current boot**.
+> The plists are still on disk, so on the next restart launchd loads all three
+> again:
+>
+> - `com.nexus.inventory-autostart` → `docker compose up -d` → the Mac's stale
+>   stack comes back
+> - `com.cloudflare.cloudflared` (root, `RunAtLoad`) → **a second connector on
+>   the same tunnel**
+>
+> Cloudflare then load-balances between the two connectors, so visitors are
+> served at random from either the real server or the Mac's frozen copy of the
+> database. Writes land in whichever they happened to reach.
+>
+> The state that *does* persist is `launchctl disable`, recorded in launchd's
+> override database:
+>
+> ```bash
+> launchctl disable gui/$UID/com.nexus.inventory-autostart
+> launchctl disable gui/$UID/com.praponb.inventory.backup
+> sudo launchctl disable system/com.cloudflare.cloudflared     # needs root
+> ```
+>
+> Verify with `launchctl print-disabled gui/$UID` and
+> `sudo launchctl print-disabled system`. All three were disabled on
+> 2026-08-29. Re-enabling them is part of the rollback below — and note that
+> `launchctl enable` is required before `bootstrap` will do anything.
+
+
+
 After cutover the Mac keeps its stopped containers, its volumes, and its
 `backups/`. Both LaunchAgents stay unloaded so nothing restarts behind your back.
 
@@ -546,10 +580,14 @@ To roll back, in this order:
 # --- on the server: release the tunnel before anything else claims it
 sudo systemctl stop cloudflared
 
-# --- on the Mac
+# --- on the Mac. `enable` first: these are persistently disabled, and
+#     bootstrap/load silently does nothing against a disabled job.
 cd ~/GitHub/Nexus_ClaudeCode && docker compose start
+launchctl enable gui/$UID/com.nexus.inventory-autostart
+launchctl enable gui/$UID/com.praponb.inventory.backup
 launchctl load ~/Library/LaunchAgents/com.nexus.inventory-autostart.plist
 launchctl load ~/Library/LaunchAgents/com.praponb.inventory.backup.plist
+sudo launchctl enable system/com.cloudflare.cloudflared
 sudo launchctl bootstrap system /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
 ```
 
@@ -558,13 +596,28 @@ back or you will lose it.
 
 ---
 
-## 8. Open items
+## 8. What actually happened, and what is still open
 
-### Two pre-existing defects found during the migration
+### Things that differed from the plan
 
-Neither is caused by the move — both reproduce identically on the Mac, which is
-live production today. They are recorded here because the migration is what
-surfaced them.
+Worth reading before the next deployment — every one of these cost time.
+
+| Expectation | Reality |
+|---|---|
+| `apt install cloudflared` works on an LTS | Cloudflare publishes **no `resolute` suite** — 404. Installed from the release `.deb`, which means apt will never update it. |
+| Docker would need installing | Already present (29.7.2) but **not apt-managed** (`/usr/local/bin/docker`, convenience script), so `apt upgrade` will never update it either. |
+| coreutils is GNU | It is **uutils 0.8.0**, the Rust reimplementation. The smoke test in section 2 is not hypothetical — run it. |
+| The server was idle | It already served `chatbot.praponb.com` from two containers, up 10 days. Never `docker system prune -a` there. |
+| `sudo` would be available to automation | It requires a password. The entire app deployment turned out to need **no root at all** — only cloudflared, ufw, systemd units and `/etc/cloudflared` did. |
+| The health check returns 200 | It returns **301** without `X-Forwarded-Proto: https`, because production sets `SECURE_SSL_REDIRECT`. |
+| `docker compose exec` can restore media | Fails without `-u root`; the volume is root-owned. |
+| macOS `rsync` accepts modern flags | It is **openrsync**, which rejects `--info=`. A sync appeared to succeed while transferring nothing. |
+
+### Two pre-existing defects
+
+Neither is caused by the move — both reproduce identically on the standby Mac,
+which was live production until 2026-08-29. They are recorded here because the
+migration is what surfaced them.
 
 **1. Attachment uploads are broken (production).** The `backend_media` volume is
 `root:root`, while the backend container runs as `appuser` (uid 10001). The real
@@ -579,7 +632,7 @@ This is why the media volume is empty — nothing was ever successfully written.
 Any user who has tried to attach a file to an asset got an error. The fix is a
 `chown` of the media directory in `backend/Dockerfile` before `USER appuser`, so
 freshly created volumes inherit `appuser` ownership, plus a one-off
-`docker run --rm -v <project>_backend_media:/m alpine chown -R 10001:10001 /m`
+`docker run --rm -v inventory_backend_media:/m alpine chown -R 10001:10001 /m`
 for volumes that already exist. **Not applied** — it is an app change, outside
 this migration.
 
@@ -603,9 +656,17 @@ not run it before deciding whether the underlying recording bug matters.
 - **The server has no git history.** Deployment provenance depends on this Mac's
   working tree being committed before each sync. A deploy key and `git clone`
   would fix that later without disturbing anything else.
-- Off-host backup copies (see section 6).
+- **The `inventory-backup` systemd timer is not installed yet** — production
+  currently has no scheduled backup. Section 6 has the commands; it needs root.
+- Off-host backup copies (see section 6). The dumps sit on the same disk as the
+  database they protect, which covers bad migrations but not drive failure.
+- **A reboot of the server has not been tested.** Boot resilience was verified
+  structurally (`docker`, `containerd`, `cloudflared` all `enabled`; every
+  container `unless-stopped`) but not proven by an actual restart.
 - The Cloudflare edge rate-limiting rule and Bot Fight Mode are still not
   configured; they are independent of this migration.
+- Move `~/inventory-credentials-20260828.txt` into a password manager and
+  delete it — it holds the human account passwords and predates this migration.
 - Consider rotating `DJANGO_SECRET_KEY` and `POSTGRES_PASSWORD` once settled — a
   host change is a natural rotation point. Rotating the secret key only logs
   everyone out; it does not affect the audit chain.

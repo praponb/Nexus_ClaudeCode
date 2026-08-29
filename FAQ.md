@@ -66,9 +66,14 @@ test suite (`pytest` spins up a throwaway `test_*` database).
 ## Is this deployed anywhere?
 
 Yes — <https://inventory.praponb.com>, publicly reachable by anyone since
-2026-08-28. It runs from Docker Compose on a Mac, exposed through a
-Cloudflare Tunnel. There is **no Cloudflare Access gate any more**: the
-Django login is the only thing in front of it.
+2026-08-28. There is **no Cloudflare Access gate**: the Django login is the only
+thing in front of it.
+
+Since **2026-08-29** it runs on a dedicated **Ubuntu 26.04 LTS server on the
+LAN**, not on a laptop. Docker Compose there serves the same six services, and a
+systemd `cloudflared` service carries the same Cloudflare Tunnel, so the public
+URL never changed. The MacBook that used to host it is a **cold standby** —
+stopped, with its data frozen at the moment of cutover.
 
 The public demo account is read-only:
 
@@ -76,15 +81,41 @@ The public demo account is read-only:
 demo / PublicDemo2026!
 ```
 
-For the full account list, the security controls in front of that login, and
-the operational runbook, see
-[`SESSION-2026-08-28-SECURITY.md`](SESSION-2026-08-28-SECURITY.md).
+- Deployment, operations, and rollback: [`DEPLOY-UBUNTU.md`](DEPLOY-UBUNTU.md)
+- Account list, security controls, and history:
+  [`SESSION-2026-08-28-SECURITY.md`](SESSION-2026-08-28-SECURITY.md)
+
+## How do I deploy a change to the live site?
+
+The server has **no git remote** — code gets there by rsync from the machine you
+develop on:
+
+```bash
+git commit -am "..."                # commit FIRST, see the warning below
+./scripts/sync-to-server.sh         # rsync to the server
+
+ssh prapon@192.168.1.49
+cd ~/inventory
+./scripts/backup.sh                 # always, before anything else
+docker compose build && docker compose up -d
+./scripts/migrate.sh
+```
+
+> **Your working tree is the only record of what is deployed.** Because the
+> server has no git history, an uncommitted change that gets synced is
+> untraceable afterwards. `sync-to-server.sh` warns when the tree is dirty —
+> don't ignore it on a real deploy.
+
+`node_modules` and `.venv` are deliberately excluded from the sync: they hold
+compiled binaries for the developer machine's architecture, and the Docker build
+recreates them correctly inside the images.
 
 ## What do I log in with?
 
 **On the deployed site**, only two accounts are active: `demo` (above) and the
 administrator account, which requires a TOTP code from an authenticator app in
-addition to its password. The other five seeded accounts are **deactivated** —
+addition to its password. (The TOTP secret lives in the database, so it survived
+the 2026-08-29 server move — the same authenticator entry still works.) The other five seeded accounts are **deactivated** —
 they were unused and every live account is attack surface.
 
 **On a fresh local checkout**, `seed_dev` creates six demo users:
@@ -107,6 +138,26 @@ prints it once to the console — check your terminal output, it isn't
 stored anywhere retrievable afterward. Note that `seed_dev` only sets a
 password when it *creates* a user, so re-running it will not reset an
 existing account's password.
+
+## Where does my data live, and is it backed up?
+
+On the Ubuntu server, in Docker volumes: PostgreSQL for the records, plus a
+separate volume for attachments. Neither is published to the network — the
+database has no exposed port at all, and the app itself is bound to localhost so
+only the tunnel can reach it.
+
+`scripts/backup.sh` produces a timestamped, gzipped database dump **and** a
+matching tarball of the attachment volume, under `backups/`. A database dump
+alone would be a half backup: restoring it would leave every attachment record
+pointing at a file that no longer exists. A systemd timer runs it daily and
+keeps the newest 14 of each.
+
+Restores are rehearsed, not assumed — the migration itself was a full restore
+onto a new machine, which came back with all 100,213 assets and zero errors.
+
+One gap worth knowing: the backups sit on the **same disk** as the database they
+protect. That covers accidental deletion and bad migrations, not drive failure.
+Copying them to another machine is still outstanding.
 
 ## What stops someone brute-forcing the login?
 
@@ -219,7 +270,26 @@ Honestly, per the latest run's [final report](runs/):
 - Full-scale (~100k record) performance verification wasn't run in this
   environment; query-count discipline was verified at seeded volume only.
 
-None of these block normal use of the app in a dev/demo environment.
+Two further defects were found on 2026-08-29 while migrating the app to its own
+server. Both are **pre-existing and still open**, and neither was caused by the
+move — they reproduce identically on the old host:
+
+- **Attaching a file to an asset fails.** The media volume is owned by `root`
+  while the application container runs as an unprivileged user, so writing an
+  attachment raises `PermissionError`. This is why no attachment has ever been
+  stored. Anyone who has tried to attach a file will have seen an error.
+- **The audit log's tamper-evident chain does not verify.** `verify_chain()`
+  returns `False`: seven `auth.*` events (sign-in, sign-out, 2FA enrolment and
+  verification) carry a hash that does not recompute from their stored content.
+  The chain *links* between records are all intact, so this is not a truncated
+  or spliced log — it is seven individual records disagreeing with their own
+  hash. `reseal_chain()` would make the check pass but would overwrite the
+  evidence needed to explain it, so it has deliberately not been run.
+
+Details and suggested fixes: [`DEPLOY-UBUNTU.md`](DEPLOY-UBUNTU.md) section 8.
+
+Apart from those two, none of these block normal use of the app in a dev/demo
+environment.
 
 ## Where do I report a real problem?
 
