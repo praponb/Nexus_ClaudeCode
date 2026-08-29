@@ -8,10 +8,10 @@ not to be lost; looking for it surfaced everything else.
 
 > **Two things to know before reading on.**
 >
-> **Production moved off this MacBook on 2026-08-29** to an Ubuntu 26.04 server,
-> `prapon@192.168.1.49`. Every security control described here is unchanged and
-> still in force; the *host* details are not. Part 3 has been corrected to the
-> server, and [`DEPLOY-UBUNTU.md`](DEPLOY-UBUNTU.md) covers host operations.
+> **Production runs on an Ubuntu 26.04 server**, `prapon@192.168.1.49`, not on
+> this MacBook — it moved on 2026-08-29. Every security control described here is
+> still in force. Part 3 is written for the server, and
+> [`DEPLOY-UBUNTU.md`](DEPLOY-UBUNTU.md) covers host operations.
 >
 > **Nothing here is a task list.** Open items live in exactly one place:
 > [`SESSION-2026-08-29-ISSUES.md`](SESSION-2026-08-29-ISSUES.md).
@@ -157,9 +157,8 @@ compose edit, failed to bind, and left three containers in `Created`.
 > **Lesson:** editing `compose.yaml` triggers an unattended recreate within 5
 > minutes. Check `~/Library/Logs/inventory-stack-autostart.log` after any edit.
 >
-> That watchdog is now `launchctl disable`d, so the hazard is inert — **and it
-> comes back the moment the agent is reloaded.** The lesson is kept for that
-> reason, not for history.
+> That watchdog is `launchctl disable`d today, so the hazard is inert — **and it
+> returns the moment the agent is reloaded.**
 
 The fix — not publishing Postgres at all — is also the more secure outcome.
 Nothing on the host needs it: the app reaches Postgres over the compose network
@@ -189,8 +188,7 @@ was "Cloudflare edge propagation settling" actually supported.
 - **Settings:** `config.settings.production` — DEBUG off, HSTS, Secure cookies,
   `X-Frame-Options: DENY`.
 - **Backups:** daily at 03:15 via the `inventory-backup.timer` systemd unit on
-  the server, 14 kept (`BACKUP_KEEP` in `inventory-backup.service`). The old
-  `com.praponb.inventory.backup` LaunchAgent is disabled and no longer runs.
+  the server, 14 kept (`BACKUP_KEEP` in `inventory-backup.service`).
   `scripts/pull-backups.sh` copies the dumps to the Mac, so they are not sitting
   on the same disk as the database they came from.
 
@@ -207,8 +205,7 @@ see finance fields, read the audit log, or reach user admin.
 
 ### Credentials
 
-- **Publishable:** `demo` / `PublicDemo2026!` (re-verified against the running
-  database on 2026-08-30).
+- **Publishable:** `demo` / `PublicDemo2026!`
 - **Private:** in `~/inventory-credentials-20260828.txt` on the Mac (mode `600`).
   Deliberately **not** recorded here — anything committed persists in git
   history forever. Moving it into a password manager is tracked as
@@ -216,9 +213,8 @@ see finance fields, read the audit log, or reach user admin.
 
 ### Common operations
 
-**These run on the server, not this Mac** — production moved on 2026-08-29, and
-the containers they talk to are there. The one exception is `check.sh`, which is
-a development gate and runs locally.
+**These run on the server, not this Mac** — that is where the containers are.
+The one exception is `check.sh`, a development gate that runs locally.
 
 ```bash
 # Unlock an account locked by failed attempts
@@ -273,19 +269,9 @@ broker/results), so they are shared across gunicorn workers.
 
 ---
 
-## Outstanding actions
+## Known gaps, left open by choice
 
-There is no task list here. This session's follow-ups were folded into
-[`SESSION-2026-08-29-ISSUES.md`](SESSION-2026-08-29-ISSUES.md), which is the
-single record of what is still open — keeping two lists is how the last set went
-stale. For the record: 2FA enrolment (the one item that was blocking admin
-sign-in) was completed on 2026-08-28; the Cloudflare edge rules and the
-credentials file are still open and are tracked there.
-
-### Known gaps, left open by choice
-
-Kept here because they are reference, not tasks — none of them is going to be
-"done".
+Reference, not tasks — none of these is going to be "done".
 
 - **No edge WAF** beyond the rate-limiting rule tracked in
   `SESSION-2026-08-29-ISSUES.md` §6.
