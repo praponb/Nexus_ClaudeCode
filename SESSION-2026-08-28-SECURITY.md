@@ -1,22 +1,20 @@
 # Asset Inventory — security session, 2026-08-28
 
-> **Superseded in part on 2026-08-29:** production moved off this MacBook to
-> an Ubuntu 26.04 server. The security work described here is unchanged and
-> still in force; only the *host* details differ. Current operations:
-> `DEPLOY-UBUNTU.md`.
-
-What happened, why, and how to operate what came out of it.
+The dated record of that session, plus the application's operations runbook.
 
 The session started with "I lost my admin password" and ended with
 `inventory.praponb.com` publicly reachable and hardened. The password turned out
 not to be lost; looking for it surfaced everything else.
 
-**Superseded:** for anything still needing action, read
-`SESSION-2026-08-29-ISSUES.md` instead — the outstanding list below has since
-been partly completed (2FA enrolment is done) and is kept only as history.
-
-**Start here:** [Outstanding actions](#outstanding-actions) — 2FA enrolment is
-unfinished, which currently blocks admin sign-in.
+> **Two things to know before reading on.**
+>
+> **Production moved off this MacBook on 2026-08-29** to an Ubuntu 26.04 server,
+> `prapon@192.168.1.49`. Every security control described here is unchanged and
+> still in force; the *host* details are not. Part 3 has been corrected to the
+> server, and [`DEPLOY-UBUNTU.md`](DEPLOY-UBUNTU.md) covers host operations.
+>
+> **Nothing here is a task list.** Open items live in exactly one place:
+> [`SESSION-2026-08-29-ISSUES.md`](SESSION-2026-08-29-ISSUES.md).
 
 ---
 
@@ -26,12 +24,13 @@ Four commits, in order.
 
 ### `91bb4ae` — restore production settings, make rate limiting real
 
-The password was never lost. the recorded `admin` password still verified against
+The password was never lost. The recorded `admin` password still verified against
 the database; the screenshot showed 8 characters typed against an 11-character
 password. (That password has since been rotated and is deliberately not
 reproduced here — retired credentials get reused elsewhere, and git history is
-permanent.) There is no account lockout in this app, so a wrong password never
-locks anyone out permanently.
+permanent.) The app had no account lockout at that point, so a wrong password
+could not have locked anyone out permanently. `744c5c0`, later the same session,
+is where that changed.
 
 Checking for a lockout is what surfaced the rest:
 
@@ -140,7 +139,7 @@ to refuse a replayed one.
 
 ---
 
-## Two incidents
+## Part 2 — Two incidents
 
 Recorded because they are the ones worth not repeating.
 
@@ -157,6 +156,10 @@ compose edit, failed to bind, and left three containers in `Created`.
 
 > **Lesson:** editing `compose.yaml` triggers an unattended recreate within 5
 > minutes. Check `~/Library/Logs/inventory-stack-autostart.log` after any edit.
+>
+> That watchdog is now `launchctl disable`d, so the hazard is inert — **and it
+> comes back the moment the agent is reloaded.** The lesson is kept for that
+> reason, not for history.
 
 The fix — not publishing Postgres at all — is also the more secure outcome.
 Nothing on the host needs it: the app reaches Postgres over the compose network
@@ -176,7 +179,7 @@ was "Cloudflare edge propagation settling" actually supported.
 
 ---
 
-## Part 2 — Operations runbook
+## Part 3 — Operations runbook
 
 ### Current state
 
@@ -185,7 +188,11 @@ was "Cloudflare edge propagation settling" actually supported.
   published. Nothing on the LAN can bypass Cloudflare.
 - **Settings:** `config.settings.production` — DEBUG off, HSTS, Secure cookies,
   `X-Frame-Options: DENY`.
-- **Backups:** daily via `com.praponb.inventory.backup` LaunchAgent, 14 kept.
+- **Backups:** daily at 03:15 via the `inventory-backup.timer` systemd unit on
+  the server, 14 kept (`BACKUP_KEEP` in `inventory-backup.service`). The old
+  `com.praponb.inventory.backup` LaunchAgent is disabled and no longer runs.
+  `scripts/pull-backups.sh` copies the dumps to the Mac, so they are not sitting
+  on the same disk as the database they came from.
 
 ### Accounts
 
@@ -200,52 +207,55 @@ see finance fields, read the audit log, or reach user admin.
 
 ### Credentials
 
-- **Publishable:** `demo` / `PublicDemo2026!`
-- **Private:** in `~/inventory-credentials-20260828.txt` (mode `600`).
+- **Publishable:** `demo` / `PublicDemo2026!` (re-verified against the running
+  database on 2026-08-30).
+- **Private:** in `~/inventory-credentials-20260828.txt` on the Mac (mode `600`).
   Deliberately **not** recorded here — anything committed persists in git
-  history forever. Move it into a password manager and delete the file.
+  history forever. Moving it into a password manager is tracked as
+  `SESSION-2026-08-29-ISSUES.md` §3.3.
 
 ### Common operations
 
+**These run on the server, not this Mac** — production moved on 2026-08-29, and
+the containers they talk to are there. The one exception is `check.sh`, which is
+a development gate and runs locally.
+
 ```bash
 # Unlock an account locked by failed attempts
-docker compose exec backend python -c "import django; django.setup(); \
-  from apps.core.login_guard import reset; reset('praponb')"
+ssh prapon@192.168.1.49 'cd ~/inventory && docker compose exec -T backend \
+  python -c "import django; django.setup(); \
+  from apps.core.login_guard import reset; reset(\"praponb\")"'
 
-# Back up now (also runs daily via LaunchAgent)
-./scripts/backup.sh
-
-# Quality gates — falls back to a dev-stage container automatically,
-# because the deployed image is production and has no ruff/mypy/pytest
-./scripts/check.sh
+# Back up now (also runs daily via the systemd timer)
+ssh prapon@192.168.1.49 'cd ~/inventory && ./scripts/backup.sh'
 
 # Reactivate a deactivated account
-docker compose exec backend python -c "import django; django.setup(); \
+ssh prapon@192.168.1.49 'cd ~/inventory && docker compose exec -T backend \
+  python -c "import django; django.setup(); \
   from django.contrib.auth import get_user_model; U=get_user_model(); \
-  u=U.objects.get(username='manager'); u.is_active=True; u.save()"
+  u=U.objects.get(username=\"manager\"); u.is_active=True; u.save()"'
 
-# Ad-hoc database access (Postgres is not published to the host)
-docker compose exec postgres psql -U asset_inventory -d asset_inventory
+# Ad-hoc database access (Postgres is published nowhere at all)
+ssh -t prapon@192.168.1.49 'cd ~/inventory && docker compose exec postgres \
+  psql -U asset_inventory -d asset_inventory'
+
+# Quality gates — ON THE MAC. Falls back to a dev-stage container automatically,
+# because the deployed image is production and has no ruff/mypy/pytest
+./scripts/check.sh
 ```
 
-**If the site is unreachable**, in order. Note the host changed on 2026-08-29 —
-everything below now runs on the Ubuntu server (`ssh prapon@192.168.1.49`), not
-this Mac. See `DEPLOY-UBUNTU.md`.
+**If the site is unreachable**, in order:
 
 1. `curl https://inventory.praponb.com/api/v1/health/ready/` — a non-200 means
    the stack is down.
 2. `ssh prapon@192.168.1.49 'cd ~/inventory && docker compose ps'` — all six
    services should be up, postgres/redis healthy.
-3. `systemctl status cloudflared` on the server — only if the origin is
-   confirmed healthy. `journalctl -u cloudflared -n 50` for detail.
-4. `systemctl status docker` — unlike Docker Desktop on the Mac, this is a
-   normal system service and rarely the culprit.
+3. `ssh prapon@192.168.1.49 'systemctl status cloudflared'` — only if the origin
+   is confirmed healthy. `journalctl -u cloudflared -n 50` for detail.
+4. `ssh prapon@192.168.1.49 'systemctl status docker'` — unlike Docker Desktop on
+   the Mac, this is a normal system service and is rarely the culprit.
 
 A 502 with Cloudflare "Working" / Host "Error" always means the origin.
-
-**The Docker Desktop failure mode below no longer applies to production.** It
-was the single most likely cause of a 502 while the Mac was the host; the Mac is
-now a stopped cold standby. Kept for the history and for local development.
 
 ### Security posture
 
@@ -265,40 +275,26 @@ broker/results), so they are shared across gunicorn workers.
 
 ## Outstanding actions
 
-### 1. Finish 2FA enrolment — blocking admin sign-in
-
-`praponb` has an unconfirmed TOTP device, so the password step currently ends at
-a setup screen. The stale pending record is harmless: opening setup issues a
-fresh secret and discards it.
-
-1. <https://inventory.praponb.com/login>, sign in as **`praponb`**
-2. Scan the QR with an authenticator app
-3. Enter the 6-digit code, then **save the 10 recovery codes** — shown once only
-
-### 2. Cloudflare edge protection
-
-Dashboard-only work, free plan, not yet applied.
-
-- **Rate limiting rule** — `praponb.com` → Security → WAF → Rate limiting rules.
-  Expression `URI Path equals /api/v1/auth/login/` and
-  `Hostname equals inventory.praponb.com`; characteristic **IP**; **20 requests
-  / 1 minute**; action **Block**, 10 minutes. The free plan allows one rule, and
-  this is the one worth spending it on — it stops attack traffic before it
-  reaches the Mac.
-- **Bot Fight Mode** — Security → Bots → toggle on.
-
-### 3. Move credentials to a password manager
-
-Then delete `~/inventory-credentials-20260828.txt`.
+There is no task list here. This session's follow-ups were folded into
+[`SESSION-2026-08-29-ISSUES.md`](SESSION-2026-08-29-ISSUES.md), which is the
+single record of what is still open — keeping two lists is how the last set went
+stale. For the record: 2FA enrolment (the one item that was blocking admin
+sign-in) was completed on 2026-08-28; the Cloudflare edge rules and the
+credentials file are still open and are tracked there.
 
 ### Known gaps, left open by choice
 
-- **No edge WAF** beyond the rate-limiting rule above.
+Kept here because they are reference, not tasks — none of them is going to be
+"done".
+
+- **No edge WAF** beyond the rate-limiting rule tracked in
+  `SESSION-2026-08-29-ISSUES.md` §6.
 - **The lockout is DoS-able**: anyone who learns a username can keep that
   account locked in 15-minute windows. This is inherent — counting unknown
   usernames is what stops the lockout leaking which accounts exist. The unlock
   command above is the mitigation.
-- **`admin` password auth from the open internet.** Mitigated by the rename,
-  a 24-character password, lockout, and TOTP — but it remains the front door.
+- **Password auth for the admin account is reachable from the open internet.**
+  Mitigated by the rename of `admin` to `praponb`, a 24-character password,
+  lockout, and TOTP — but it remains the front door.
 - **`.env` is gitignored**, so production configuration is not backed up by
   `git push`. This is exactly what let the settings silently revert before.

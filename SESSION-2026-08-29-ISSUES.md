@@ -45,12 +45,16 @@ but the underlying design weakness is still there, so this stays open.
 payload of every event that user ever caused while leaving `prev_hash` untouched.
 The links stay intact; only the individual rows disagree with their own hash.
 All seven failing records (ids 403–409) are accounted for by one deleted
-account, `75c2cb8f-…` — the one that first enrolled TOTP before the enrolment
-was redone as `praponb`. It is bookkeeping, not tampering.
+account, `75c2cb8f-…` — a second `system_admin` created and deleted during the
+2FA work (it completed `mfa.enroll` and `mfa.verify`, and MFA is required only
+for that role). It is bookkeeping, not tampering. It is **not** the old `admin`
+account: `praponb` is user id 1 and carried the same UUID before, during and
+after that work, which is what a rename looks like.
 
 **The real gap.** There is no audit event recording that deletion. A user
-vanished from the system and the audit log does not say who removed them or
-when — a bigger weakness than the hash mismatch that led here.
+vanished from the system and the audit log does not say who removed them, or
+when, or even what the account was called — a bigger weakness than the hash
+mismatch that led here.
 
 **Two fixes, neither applied.** Both change how hashing works and need their own
 decision:
@@ -111,9 +115,8 @@ Recorded so they are not rediscovered as surprises.
   from apps.core.login_guard import reset; reset(\"praponb\")"'
   ```
 - **Admin password auth is reachable from the open internet.** Mitigated by the
-  move to the `praponb` account, a long password, per-account lockout, and
-  mandatory TOTP. (Per §2.2 this was a new account plus a deletion of the old
-  one, not a rename — and the deletion was not audited.)
+  rename to `praponb`, a 24-character password, per-account lockout, and
+  mandatory TOTP — but it remains the front door.
 - **Backup pulls are manual.** `scripts/pull-backups.sh` copies the server's
   dumps to this Mac, but `com.praponb.inventory.pull-backups.plist` is
   deliberately *not* bootstrapped: this Mac is a cold standby and its value is

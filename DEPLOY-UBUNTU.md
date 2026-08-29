@@ -659,8 +659,9 @@ recomputes hashes from whatever is stored — it papers over the discrepancy
 rather than explaining it, and destroys the evidence needed to diagnose it.
 
 > **EXPLAINED 2026-08-30, and still not resealed.** All seven rows are accounted
-> for by a single deleted user (`75c2cb8f-…`), the account that first enrolled
-> TOTP before the enrolment was redone as `praponb`. `AuditEvent.actor` is
+> for by a single deleted user (`75c2cb8f-…`) — a second `system_admin` created
+> and deleted during the 2FA work, **not** the old `admin` account, which was
+> renamed to `praponb` and kept its UUID. `AuditEvent.actor` is
 > `on_delete=SET_NULL` and `_payload_for()` hashes `actor.uuid`, so deleting a
 > user rewrites the payload of every event they caused while leaving `prev_hash`
 > untouched — links intact, individual rows disagreeing. Bookkeeping, not
