@@ -85,9 +85,15 @@ procedure and rollback: `DEPLOY-UBUNTU.md`.
   made editing `compose.yaml` dangerous is therefore inert — but reload it and
   that hazard returns.
 - The tunnel LaunchDaemon (`/Library/LaunchDaemons/com.cloudflare.cloudflared.plist`)
-  is **booted out**. Restoring it is the rollback step, and must never run while
+  is `launchctl disable`d in the **system** domain — confirmed by reading the
+  override back on 2026-08-31, so it does **not** return at boot and the Mac is
+  safe to restart. Re-enabling it is the rollback step, and must never run while
   the server's tunnel is up — one tunnel, one host, or Cloudflare load-balances
   across two diverging databases.
+- That override is the *only* thing holding it: the plist is still installed and
+  still `RunAtLoad`, and the rollback's `launchctl enable` re-arms it. So after
+  any rollback, re-run the check in `SESSION-2026-08-29-ISSUES.md` §8 before the
+  next reboot — `bootout` alone lasts only for the current boot.
 - `jobs4dent` and `twin` LaunchAgents were `launchctl disable`d on 2026-08-29.
   Renaming a plist does **not** disable it; only `launchctl disable` persists.
 

@@ -567,7 +567,10 @@ from this Mac.
 >
 > Verify with `launchctl print-disabled gui/$UID` and
 > `sudo launchctl print-disabled system`. All three were disabled on
-> 2026-08-29. Re-enabling them is part of the rollback below — and note that
+> 2026-08-29, and **all three overrides were read back and confirmed still
+> present on 2026-08-31** — the two agents in the `gui` domain and
+> `com.cloudflare.cloudflared` in `system`. That check is the one that matters:
+> until it has been run, "the tunnel is stopped" only means stopped *now*. Re-enabling them is part of the rollback below — and note that
 > `launchctl enable` is required before `bootstrap` will do anything.
 
 

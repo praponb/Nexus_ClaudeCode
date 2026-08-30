@@ -30,6 +30,7 @@ Four of these cannot be done from a terminal at all.
 | [3.7](#3-operational-gaps) | Server reboot never tested | Needs someone watching the box come back up. |
 | [3.8](#3-operational-gaps) | `.env` is gitignored, so production config is not in git | Inherent to the design. Verify the *running* config, not the repo. |
 | [3b.1](#3b-neighbouring-systems) | **Jobs4Dent has had no database backup since 2026-08-28** | Different repo. Found here, needs fixing there. |
+| [3.10](#3-operational-gaps) | Whether to keep `SESSION-2026-08-28-SECURITY.md` | Deleting it drops content that exists nowhere else. Decision, not a task. |
 
 ---
 
@@ -90,6 +91,8 @@ place it survives.
 | 3.6 | **Docker is not apt-managed** either (`/usr/local/bin/docker`, from the convenience script), so `apt upgrade` will not update the container runtime. | Convert to the apt packages when convenient. |
 | 3.7 | **Server reboot never tested.** Boot resilience was verified structurally — `docker`, `containerd`, `cloudflared` all `enabled`, every container `unless-stopped` — but not proven by an actual restart. | `sudo reboot` when you can watch it. |
 | 3.8 | **`.env` is gitignored**, so production configuration is not backed up by `git push`. This is exactly what let the production settings silently revert once before. | Inherent. Verify the *running* config, not the repo. |
+| 3.9 | ~~The Mac's tunnel LaunchDaemon may still be armed for boot.~~ **Resolved 2026-08-31 by observation.** `sudo launchctl print-disabled system` returns `"com.cloudflare.cloudflared" => disabled`, so the system-domain override from 2026-08-29 did stick and the daemon stays down across a restart. Kept here because the plist is still installed with `RunAtLoad` + `KeepAlive` — the override is the only thing holding it, and `launchctl enable` (part of the rollback) re-arms it. | Nothing to do. Re-check with [§8](#8-before-and-after-rebooting-this-mac) after any rollback. |
+| 3.10 | **`SESSION-2026-08-28-SECURITY.md` — keep or relocate?** It has no pending items (its own banner says so), which raised the question of deleting it. But four things live only there: the accounts table with active/deactivated/TOTP status, the reactivate-account command (`is_active=True`), the consolidated security-posture table (`ImportExportThrottle` appears in no other doc), and the *rationale* behind the security invariants `CLAUDE.md` says must not be weakened without discussion. Three documents link to it: `CLAUDE.md`, `DEPLOY-UBUNTU.md`, `FAQ.md`. | Either leave it (recommended), or move Part 3 into `DEPLOY-UBUNTU.md` §6 and retarget the three links *before* deleting. |
 
 ---
 
@@ -157,11 +160,11 @@ would.
 
 ## 7. Current state, for reference
 
-Verified 2026-08-30.
+Verified 2026-08-31.
 
 **Production — Ubuntu 26.04.1 LTS, `prapon@192.168.1.49`, `~/inventory`**
-- Six containers up; backend/frontend bound to `127.0.0.1`, Postgres and Redis
-  not published at all
+- Six containers up (28-37h uptime); backend/frontend bound to `127.0.0.1`,
+  Postgres and Redis not published at all
 - `cloudflared` systemd service active and enabled; `docker` and `containerd`
   enabled at boot; every container `unless-stopped`
 - `DEBUG=False`, `config.settings.production`, Redis-backed throttle cache,
@@ -169,15 +172,22 @@ Verified 2026-08-30.
 - Data: 100,213 assets, 7 users (2 active: `demo`/viewer, `praponb`/system_admin),
   1 confirmed TOTP device, 10 unused recovery codes
 - Attachment storage working, `/app/media` owned by `appuser`
-- Running `DEPLOYED_COMMIT` `ab4cdd4`, branch `b_pbv_main`, `dirty=no`
+- Deployed SHA matched local `HEAD` when last checked (2026-08-31). Pinning the
+  hash here just goes stale — read it instead:
+  `ssh prapon@192.168.1.49 'cat ~/inventory/DEPLOYED_COMMIT'`
 - `https://inventory.praponb.com` → 200; `https://chatbot.praponb.com` → 200
 - Also hosts `chatbot.praponb.com` — leave those containers alone
 
 **Standby — this MacBook**
 - All six containers stopped (`stop`, not `down -v`); volumes intact
 - Data frozen at cutover; this is a rollback window of hours, not a replica
-- Every relevant launchd job persistently `disabled`, tunnel daemon included, so
-  the Mac is safe to reboot
+- Both LaunchAgents re-verified persistently `disabled` on 2026-08-31 via
+  `launchctl print-disabled gui/$UID`; no cloudflared process running here
+- Tunnel LaunchDaemon confirmed `disabled` in the `system` domain on 2026-08-31
+  (`sudo launchctl print-disabled system`), so **this Mac is safe to reboot**.
+  The plist is still installed and `RunAtLoad`, so the override is the only
+  thing holding it down — re-check with [§8](#8-before-and-after-rebooting-this-mac)
+  after any rollback, or if the daemon is ever `enable`d
 - `cloudflared` here is **2026.7.3**; the server runs **2026.8.2**. Only matters
   if the Mac is brought back for a rollback
 - Holds a second copy of the server's backups in `~/inventory-backups`
@@ -192,3 +202,47 @@ Verified 2026-08-30.
 **Repository**
 - Branch `b_pbv_main`
 - Rollback procedure: `DEPLOY-UBUNTU.md` §7
+
+---
+
+## 8. Before and after rebooting this Mac
+
+A reboot is the one action that can undo the cutover by accident. `bootout` and
+`unload` last only for the current boot; the plists are all still on disk. The
+state that survives is the `launchctl disable` override, and only the two
+LaunchAgents have been confirmed today — `com.cloudflare.cloudflared` is a root
+LaunchDaemon with `RunAtLoad` and `KeepAlive`, so if its override is missing it
+comes straight back at boot and Cloudflare load-balances the live hostname
+across the server and this Mac's frozen database.
+
+**Last checked 2026-08-31: all three overrides present, this Mac is safe to
+reboot.** Re-run the check anyway after a rollback, or after anything that runs
+`launchctl enable`.
+
+**Before rebooting** — this is the whole check:
+
+```bash
+sudo launchctl print-disabled system | grep cloudflare
+```
+
+- `"com.cloudflare.cloudflared" => disabled` → nothing else to do; reboot.
+- Absent, or `=> enabled` → run this first, then reboot:
+  ```bash
+  sudo launchctl disable system/com.cloudflare.cloudflared
+  ```
+
+Do **not** delete or rename the plist instead. launchd keys off the `Label`, not
+the filename, and the plist is needed as-is for the rollback in
+[`DEPLOY-UBUNTU.md`](DEPLOY-UBUNTU.md) §7.
+
+**After rebooting**, confirm the Mac came back inert and production is untouched:
+
+```bash
+pgrep -fl cloudflared                 # expect no output
+docker ps -q | wc -l                  # expect 0 (Docker Desktop may not even start)
+curl -sS -o /dev/null -w '%{http_code}\n' https://inventory.praponb.com/   # 200
+curl -sS -o /dev/null -w '%{http_code}\n' https://chatbot.praponb.com/     # 200
+```
+
+Nothing on this Mac needs starting afterwards. It is a cold standby by design,
+and `scripts/pull-backups.sh` is deliberately manual ([§4](#4-known-gaps-accepted-by-choice)).
