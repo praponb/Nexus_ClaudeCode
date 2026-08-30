@@ -30,7 +30,6 @@ Four of these cannot be done from a terminal at all.
 | [3.7](#3-operational-gaps) | Server reboot never tested | Needs someone watching the box come back up. |
 | [3.8](#3-operational-gaps) | `.env` is gitignored, so production config is not in git | Inherent to the design. Verify the *running* config, not the repo. |
 | [3b.1](#3b-neighbouring-systems) | **Jobs4Dent has had no database backup since 2026-08-28** | Different repo. Found here, needs fixing there. |
-| [3.9](#3-operational-gaps) | The Mac's tunnel LaunchDaemon is disabled only *as far as anyone has checked* | The `gui` domain is verified; `system/com.cloudflare.cloudflared` needs root to read. See [§8](#8-before-and-after-rebooting-this-mac). |
 | [3.10](#3-operational-gaps) | Whether to keep `SESSION-2026-08-28-SECURITY.md` | Deleting it drops content that exists nowhere else. Decision, not a task. |
 
 ---
@@ -92,7 +91,7 @@ place it survives.
 | 3.6 | **Docker is not apt-managed** either (`/usr/local/bin/docker`, from the convenience script), so `apt upgrade` will not update the container runtime. | Convert to the apt packages when convenient. |
 | 3.7 | **Server reboot never tested.** Boot resilience was verified structurally — `docker`, `containerd`, `cloudflared` all `enabled`, every container `unless-stopped` — but not proven by an actual restart. | `sudo reboot` when you can watch it. |
 | 3.8 | **`.env` is gitignored**, so production configuration is not backed up by `git push`. This is exactly what let the production settings silently revert once before. | Inherent. Verify the *running* config, not the repo. |
-| 3.9 | **The Mac's tunnel LaunchDaemon may still be armed for boot.** `/Library/LaunchDaemons/com.cloudflare.cloudflared.plist` is still installed and still carries `RunAtLoad` + `KeepAlive`. [`DEPLOY-UBUNTU.md`](DEPLOY-UBUNTU.md) §7 records that `sudo launchctl disable system/com.cloudflare.cloudflared` was run on 2026-08-29, and the two LaunchAgents were re-verified `disabled` on 2026-08-31 — but the system-domain override needs root to read, so the daemon's state is documented, not observed. If that disable did not stick, a reboot brings up **a second connector on the live tunnel**. | Verify with the command in [§8](#8-before-and-after-rebooting-this-mac) before rebooting. |
+| 3.9 | ~~The Mac's tunnel LaunchDaemon may still be armed for boot.~~ **Resolved 2026-08-31 by observation.** `sudo launchctl print-disabled system` returns `"com.cloudflare.cloudflared" => disabled`, so the system-domain override from 2026-08-29 did stick and the daemon stays down across a restart. Kept here because the plist is still installed with `RunAtLoad` + `KeepAlive` — the override is the only thing holding it, and `launchctl enable` (part of the rollback) re-arms it. | Nothing to do. Re-check with [§8](#8-before-and-after-rebooting-this-mac) after any rollback. |
 | 3.10 | **`SESSION-2026-08-28-SECURITY.md` — keep or relocate?** It has no pending items (its own banner says so), which raised the question of deleting it. But four things live only there: the accounts table with active/deactivated/TOTP status, the reactivate-account command (`is_active=True`), the consolidated security-posture table (`ImportExportThrottle` appears in no other doc), and the *rationale* behind the security invariants `CLAUDE.md` says must not be weakened without discussion. Three documents link to it: `CLAUDE.md`, `DEPLOY-UBUNTU.md`, `FAQ.md`. | Either leave it (recommended), or move Part 3 into `DEPLOY-UBUNTU.md` §6 and retarget the three links *before* deleting. |
 
 ---
@@ -184,9 +183,11 @@ Verified 2026-08-31.
 - Data frozen at cutover; this is a rollback window of hours, not a replica
 - Both LaunchAgents re-verified persistently `disabled` on 2026-08-31 via
   `launchctl print-disabled gui/$UID`; no cloudflared process running here
-- **The tunnel LaunchDaemon's disable is documented but not re-verified** — it
-  lives in the `system` domain and reading it needs root. Run [§8](#8-before-and-after-rebooting-this-mac)
-  before restarting this Mac
+- Tunnel LaunchDaemon confirmed `disabled` in the `system` domain on 2026-08-31
+  (`sudo launchctl print-disabled system`), so **this Mac is safe to reboot**.
+  The plist is still installed and `RunAtLoad`, so the override is the only
+  thing holding it down — re-check with [§8](#8-before-and-after-rebooting-this-mac)
+  after any rollback, or if the daemon is ever `enable`d
 - `cloudflared` here is **2026.7.3**; the server runs **2026.8.2**. Only matters
   if the Mac is brought back for a rollback
 - Holds a second copy of the server's backups in `~/inventory-backups`
@@ -213,6 +214,10 @@ LaunchAgents have been confirmed today — `com.cloudflare.cloudflared` is a roo
 LaunchDaemon with `RunAtLoad` and `KeepAlive`, so if its override is missing it
 comes straight back at boot and Cloudflare load-balances the live hostname
 across the server and this Mac's frozen database.
+
+**Last checked 2026-08-31: all three overrides present, this Mac is safe to
+reboot.** Re-run the check anyway after a rollback, or after anything that runs
+`launchctl enable`.
 
 **Before rebooting** — this is the whole check:
 
